@@ -8,6 +8,8 @@ defineProps<{ article: ArticleSummary }>()
 
 <template>
   <RouterLink :to="`/article/${article.slug}`" class="card article-card fade-in">
+    <img v-if="article.cover" :src="article.cover" class="article-card__cover" :alt="article.title" />
+
     <div class="article-card__head">
       <span v-if="article.categoryName" class="tag-chip">{{ article.categoryName }}</span>
       <span v-if="article.top" class="pin"><Pin :size="13" /> 置顶</span>
@@ -33,6 +35,14 @@ defineProps<{ article: ArticleSummary }>()
   gap: 10px;
   padding: 22px 24px;
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.article-card__cover {
+  width: calc(100% + 48px);
+  margin: -22px -24px 0;
+  height: 150px;
+  object-fit: cover;
+  border-radius: 16px 16px 0 0;
 }
 
 .article-card:hover {

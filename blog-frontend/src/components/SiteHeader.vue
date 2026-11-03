@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { Menu, X, PenLine, LogOut, UserRound } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Bell, Menu, X, PenLine, LogOut, Search, UserRound } from 'lucide-vue-next'
 import ThemeToggle from './ThemeToggle.vue'
+import { interactionApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 
+const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
@@ -12,36 +14,40 @@ const scrolled = ref(false)
 const menuOpen = ref(false)
 const userMenuOpen = ref(false)
 const userMenuRef = ref<HTMLElement | null>(null)
+const unread = ref(0)
 
 const navItems = [
-  { label: '首页', to: '/' },
-  { label: '博客', to: '/blog' },
-  { label: '分类', to: '/categories' },
-  { label: '标签', to: '/tags' },
-  { label: '专栏', to: '/columns' },
-  { label: '留言', to: '/guestbook' },
-  { label: '关于', to: '/about' }
+  { label: '首页', to: '/', match: ['home'] },
+  { label: '博客', to: '/blog', match: ['blog', 'article', 'search'] },
+  { label: '分类', to: '/categories', match: ['categories', 'category'] },
+  { label: '标签', to: '/tags', match: ['tags', 'tag'] },
+  { label: '专栏', to: '/columns', match: ['columns', 'column'] },
+  { label: '留言', to: '/guestbook', match: ['guestbook'] },
+  { label: '关于', to: '/about', match: ['about'] }
 ]
+
+/** 按路由名判断高亮，避免根路径 `/` 在任意子页面都被判为 active */
+const currentName = computed(() => String(route.name ?? ''))
+function isActive(item: { match: string[] }) {
+  return item.match.includes(currentName.value)
+}
 
 const canWrite = computed(() => userStore.isAdmin)
 
-// 后台默认跑在 5174；用当前访问的主机名拼地址，
-// 这样从虚拟机/局域网打开前台时，"写文章"不会错误地跳到 127.0.0.1。
-const adminUrl = computed(
-  () => `${window.location.protocol}//${window.location.hostname}:5174`
-)
+/**
+ * 后台地址：生产由 VITE_ADMIN_URL 指向 /admin/（同域反代），
+ * 开发默认 5174；不再硬编码 host:5174，避免线上点「写文章」连不上。
+ */
+const adminUrl = computed(() => {
+  const configured = import.meta.env.VITE_ADMIN_URL
+  if (configured) return configured
+  return `${window.location.protocol}//${window.location.hostname}:5174`
+})
 
 function onScroll() {
   scrolled.value = window.scrollY > 8
 }
 
-/**
- * 点击空白处关闭用户菜单。
- *
- * 之前用 @mouseleave 关闭，鼠标从按钮移到菜单要跨过 8px 间隙，
- * 会先触发 leave 导致菜单瞬间消失，根本点不到。改用 click-outside 后
- * 菜单只在「再次点击按钮 / 点击其它位置 / 按 Esc」时关闭。
- */
 function onDocumentClick(event: MouseEvent) {
   if (!userMenuOpen.value) return
   if (userMenuRef.value && !userMenuRef.value.contains(event.target as Node)) {
@@ -56,14 +62,43 @@ function onKeydown(event: KeyboardEvent) {
   }
 }
 
+async function refreshUnread() {
+  if (!userStore.isLoggedIn) {
+    unread.value = 0
+    return
+  }
+  try {
+    const result = await interactionApi.unreadCount()
+    unread.value = result.count
+  } catch {
+    unread.value = 0
+  }
+}
+
 async function logout() {
   await userStore.logout()
   userMenuOpen.value = false
+  unread.value = 0
   router.push('/')
 }
 
+watch(
+  () => userStore.user?.id,
+  () => refreshUnread()
+)
+
+watch(
+  () => route.fullPath,
+  () => {
+    userMenuOpen.value = false
+    menuOpen.value = false
+    refreshUnread()
+  }
+)
+
 onMounted(() => {
   onScroll()
+  refreshUnread()
   window.addEventListener('scroll', onScroll, { passive: true })
   document.addEventListener('click', onDocumentClick)
   document.addEventListener('keydown', onKeydown)
@@ -90,7 +125,7 @@ onUnmounted(() => {
           :key="item.to"
           :to="item.to"
           class="link"
-          active-class="link--active"
+          :class="{ 'link--active': isActive(item) }"
           @click="menuOpen = false"
         >
           {{ item.label }}
@@ -98,6 +133,10 @@ onUnmounted(() => {
       </nav>
 
       <div class="actions">
+        <RouterLink to="/search" class="icon-btn" title="搜索" aria-label="搜索">
+          <Search :size="18" />
+        </RouterLink>
+
         <ThemeToggle />
 
         <div v-if="userStore.isLoggedIn" ref="userMenuRef" class="user">
@@ -107,14 +146,20 @@ onUnmounted(() => {
             aria-haspopup="menu"
             @click.stop="userMenuOpen = !userMenuOpen"
           >
-            <UserRound :size="16" />
+            <img v-if="userStore.user?.avatar" :src="userStore.user.avatar" class="avatar" alt="" />
+            <UserRound v-else :size="16" />
             <span class="user__name">{{ userStore.user?.nickname }}</span>
+            <span v-if="unread > 0" class="badge">{{ unread > 99 ? '99+' : unread }}</span>
           </button>
 
           <div v-if="userMenuOpen" class="user__menu-wrap" @click.stop>
             <div class="user__menu card" role="menu">
               <RouterLink to="/user" class="user__item" role="menuitem" @click="userMenuOpen = false">
                 <UserRound :size="15" /> 个人中心
+              </RouterLink>
+              <RouterLink to="/user?tab=notifications" class="user__item" role="menuitem">
+                <Bell :size="15" /> 通知
+                <span v-if="unread > 0" class="badge badge--inline">{{ unread }}</span>
               </RouterLink>
               <a
                 v-if="canWrite"
@@ -222,6 +267,23 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  color: var(--fg-soft);
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.icon-btn:hover {
+  color: var(--fg);
+  background: var(--bg-soft);
+}
+
 .btn--ghost {
   background: transparent;
   padding: 6px 12px;
@@ -232,6 +294,13 @@ onUnmounted(() => {
   position: relative;
 }
 
+.avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 .user__name {
   max-width: 90px;
   overflow: hidden;
@@ -239,8 +308,22 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-/* 外层负责 8px 的「安全距离」，内层才是带背景的卡片，
-   这样鼠标从按钮移到菜单不会经过空隙，也就不会误触关闭逻辑 */
+.badge {
+  min-width: 17px;
+  height: 17px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #e5484d;
+  color: #fff;
+  font-size: 11px;
+  line-height: 17px;
+  text-align: center;
+}
+
+.badge--inline {
+  margin-left: auto;
+}
+
 .user__menu-wrap {
   position: absolute;
   right: 0;
@@ -250,7 +333,7 @@ onUnmounted(() => {
 }
 
 .user__menu {
-  min-width: 176px;
+  min-width: 190px;
   padding: 6px;
   display: flex;
   flex-direction: column;

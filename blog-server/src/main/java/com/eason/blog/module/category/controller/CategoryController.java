@@ -36,6 +36,15 @@ public class CategoryController {
         return ApiResponse.success(categoryService.list());
     }
 
+    @GetMapping("/{slug}")
+    public ApiResponse<CategoryVO> detail(@PathVariable String slug) {
+        CategoryVO category = categoryService.getBySlug(slug);
+        if (category == null) {
+            throw com.eason.blog.common.exception.BusinessException.notFound("分类不存在");
+        }
+        return ApiResponse.success(category);
+    }
+
     @GetMapping("/{slug}/articles")
     public ApiResponse<PageResult<ArticleSummaryVO>> articles(
             @PathVariable String slug,

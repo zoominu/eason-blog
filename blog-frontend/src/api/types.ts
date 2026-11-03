@@ -34,10 +34,16 @@ export interface ArticleSummary {
 }
 
 export interface ArticleDetail extends ArticleSummary {
+  categorySlug?: string | null
+  tagSlugs: string[]
   content: string
   updateTime: string
   seoTitle?: string | null
   seoDescription?: string | null
+  prevSlug?: string | null
+  prevTitle?: string | null
+  nextSlug?: string | null
+  nextTitle?: string | null
 }
 
 export interface Category {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ArrowLeft, BookOpen } from 'lucide-vue-next'
 import { taxonomyApi } from '@/api'
@@ -13,11 +13,16 @@ const current = ref<Column | null>(null)
 const articles = ref<ArticleSummary[]>([])
 const loading = ref(true)
 
-onMounted(async () => {
+/**
+ * 列表与详情共用同一个组件（/columns 与 /column/:slug），
+ * Vue Router 会复用实例不触发 onMounted，所以必须监听路由参数重新加载，
+ * 否则站内点击专栏卡片只会改 URL 不换内容。
+ */
+async function load() {
+  loading.value = true
+  const slug = route.params.slug ? String(route.params.slug) : ''
   try {
-    const slug = route.params.slug ? String(route.params.slug) : ''
     if (slug) {
-      // 详情与文章列表并行请求
       const [column, list] = await Promise.all([
         taxonomyApi.column(slug),
         taxonomyApi.columnArticles(slug)
@@ -25,12 +30,17 @@ onMounted(async () => {
       current.value = column
       articles.value = list
     } else {
+      current.value = null
+      articles.value = []
       columns.value = await taxonomyApi.columns()
     }
   } finally {
     loading.value = false
   }
-})
+}
+
+onMounted(load)
+watch(() => route.params.slug, load)
 </script>
 
 <template>

@@ -31,17 +31,36 @@ public class CategoryService {
     }
 
     public List<CategoryVO> list() {
-        Map<Long, Long> counts = new HashMap<>();
-        for (Map<String, Object> row : articleMapper.countPublicArticlesByCategory()) {
-            counts.put(RowUtils.longValue(row, "taxonomy_id"), RowUtils.longValue(row, "total"));
-        }
-
+        Map<Long, Long> counts = counts();
         return categoryMapper.selectList(Wrappers.<Category>lambdaQuery()
                         .orderByAsc(Category::getSort)
                         .orderByAsc(Category::getId))
                 .stream()
-                .map(c -> new CategoryVO(c.getId(), c.getParentId(), c.getName(), c.getSlug(),
-                        c.getDescription(), counts.getOrDefault(c.getId(), 0L).intValue()))
+                .map(c -> toVO(c, counts))
                 .toList();
+    }
+
+    /**
+     * 分类详情：分类下没有文章时，前端也能展示名称与描述
+     * （列表接口的 categoryName 取自文章，空分类拿不到）。
+     */
+    public CategoryVO getBySlug(String slug) {
+        Category category = categoryMapper.selectOne(Wrappers.<Category>lambdaQuery()
+                .eq(Category::getSlug, slug)
+                .last("limit 1"));
+        return category == null ? null : toVO(category, counts());
+    }
+
+    private CategoryVO toVO(Category c, Map<Long, Long> counts) {
+        return new CategoryVO(c.getId(), c.getParentId(), c.getName(), c.getSlug(),
+                c.getDescription(), counts.getOrDefault(c.getId(), 0L).intValue());
+    }
+
+    private Map<Long, Long> counts() {
+        Map<Long, Long> counts = new HashMap<>();
+        for (Map<String, Object> row : articleMapper.countPublicArticlesByCategory()) {
+            counts.put(RowUtils.longValue(row, "taxonomy_id"), RowUtils.longValue(row, "total"));
+        }
+        return counts;
     }
 }

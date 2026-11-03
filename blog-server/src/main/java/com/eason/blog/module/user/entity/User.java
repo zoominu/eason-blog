@@ -37,6 +37,9 @@ public class User {
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 
+    /** JWT 版本号：改密后自增，旧 token 立即失效。 */
+    private Integer tokenVersion;
+
     @TableLogic
     private Integer isDeleted;
 }

@@ -52,11 +52,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtService.parse(token);
                 Long userId = Long.valueOf(claims.getSubject());
                 UserPrincipal principal = userDetailsService.loadById(userId);
-                if (principal != null && principal.isEnabled()) {
+                int tokenVersion = claims.get("ver", Integer.class) == null
+                        ? 0
+                        : claims.get("ver", Integer.class);
+                if (principal != null && principal.isEnabled() && principal.getTokenVersion() == tokenVersion) {
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
+                } else if (principal != null && principal.getTokenVersion() != tokenVersion) {
+                    // 改密或强制下线后，旧 token 立即失效
+                    log.debug("token version mismatch, user={}", principal.getId());
+                    SecurityContextHolder.clearContext();
                 }
             } catch (JwtException | IllegalArgumentException ex) {
                 // token 无效/过期：不抛异常，交给后面的 401 入口处理，避免影响匿名接口

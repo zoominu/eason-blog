@@ -19,19 +19,20 @@ class JwtServiceTest {
 
     @Test
     void issuesAndParsesToken() {
-        String token = jwtService.issue(42L, "reader@example.com", List.of("USER"));
+        String token = jwtService.issue(42L, "reader@example.com", List.of("USER"), 3);
 
         Claims claims = jwtService.parse(token);
 
         assertThat(claims.getSubject()).isEqualTo("42");
         assertThat(claims.get("email", String.class)).isEqualTo("reader@example.com");
         assertThat(claims.get("roles", List.class)).containsExactly("USER");
+        assertThat(claims.get("ver", Integer.class)).isEqualTo(3);
         assertThat(claims.getExpiration()).isAfter(claims.getIssuedAt());
     }
 
     @Test
     void rejectsTamperedToken() {
-        String token = jwtService.issue(1L, "a@b.com", List.of("USER"));
+        String token = jwtService.issue(1L, "a@b.com", List.of("USER"), 0);
         String tampered = token.substring(0, token.length() - 2) + "xx";
 
         assertThatThrownBy(() -> jwtService.parse(tampered)).isInstanceOf(JwtException.class);

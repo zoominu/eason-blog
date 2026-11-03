@@ -227,4 +227,5 @@ export interface Column {
   description?: string | null
   cover?: string | null
   articleCount: number
+  sort?: number
 }

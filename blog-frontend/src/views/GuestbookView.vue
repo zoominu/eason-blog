@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { MessageSquare, Send } from 'lucide-vue-next'
 import { get, post } from '@/api/http'
+import Pagination from '@/components/Pagination.vue'
 import { useUserStore } from '@/stores/user'
 import { formatDateTime } from '@/utils/format'
 
@@ -13,23 +15,39 @@ interface GuestbookMessage {
   reply?: string | null
 }
 
-const messages = ref<GuestbookMessage[]>([])
-const loading = ref(true)
+const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
+
+const messages = ref<GuestbookMessage[]>([])
+const total = ref(0)
+const pages = ref(0)
+const loading = ref(true)
 const content = ref('')
 const submitting = ref(false)
 const hint = ref('')
 
+const currentPage = computed(() => Number(route.query.page ?? 1))
+
 async function load() {
   loading.value = true
   try {
-    const page = await get<{ records: GuestbookMessage[] }>('/guestbook', { page: 1, size: 20 })
+    const page = await get<{ records: GuestbookMessage[]; total: number; pages: number }>('/guestbook', {
+      page: currentPage.value,
+      size: 10
+    })
     messages.value = page.records
+    total.value = page.total
+    pages.value = page.pages
   } catch {
-    // 接口未返回时保持空态
+    // 接口异常时保持空态
   } finally {
     loading.value = false
   }
+}
+
+function goPage(next: number) {
+  router.push({ path: '/guestbook', query: { page: String(next) } })
 }
 
 async function submit() {
@@ -49,13 +67,14 @@ async function submit() {
 }
 
 onMounted(load)
+watch(() => route.query.page, load)
 </script>
 
 <template>
   <div class="container narrow">
     <header class="head">
       <h1>留言板</h1>
-      <p class="muted">欢迎交流，留言审核后展示</p>
+      <p class="muted">欢迎交流，留言审核后展示 · 共 {{ total }} 条</p>
     </header>
 
     <div v-if="userStore.isLoggedIn" class="card composer">
@@ -90,6 +109,7 @@ onMounted(load)
         <p class="item__content">{{ message.content }}</p>
         <p v-if="message.reply" class="item__reply">博主回复：{{ message.reply }}</p>
       </div>
+      <Pagination :current="currentPage" :pages="pages" @change="goPage" />
     </div>
     <p v-else class="muted empty">还没有留言，来做第一个吧。</p>
   </div>

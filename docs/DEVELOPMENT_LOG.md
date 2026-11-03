@@ -4,6 +4,43 @@
 
 ---
 
+## 2026-11-03 · 审计报告修复（P0/P1/P2 共 20 项）
+
+按 `docs/AUDIT_REPORT_2026-11-03.md` 逐项修复，明细见该文档第 7 节。
+
+### 关键改动
+
+| 区域 | 改动 |
+| --- | --- |
+| 路由 | 守卫改用 `fetchMe()`（HttpOnly Cookie 前端读不到）；`afterEach` 重置 SEO |
+| 专栏 | 组件监听路由参数；后台新增专栏文章绑定接口与弹窗；`ColumnVO` 返回 sort |
+| 导航 | 按路由名高亮，根链接不再常亮；新增搜索入口 |
+| 文章页 | 正文与互动解耦；递归评论组件；上一篇/下一篇；代码复制、分享、标签可点击、封面 |
+| SEO | 重写 `utils/seo.ts`，修正 og 属性名，补 canonical/og:image/published_time |
+| 数据契约 | `ArticleTagResolver` 批量补标签；收藏只返回公开文章；详情返回 categorySlug/tagSlugs |
+| 认证 | V3 迁移新增 `token_version`，改密后旧 token 立即失效 |
+| 后台 | 移除标签 allow-create；创建后监听 id 重新加载；支持 `VITE_ADMIN_URL` |
+| 安全 | `ClientIp` 只信任本机代理并取 XFF 最后一段 |
+
+### 验证
+
+```
+node scripts/verify-audit.mjs   → 18/18 checks passed
+后端测试                        → 27 passed
+vue-tsc（前台/后台）            → 0 error
+vite build（前台/后台）         → 成功
+```
+
+覆盖：列表标签非空、详情返回 categorySlug/tagSlugs/上下篇、分类详情 200/404、
+归档、sitemap、robots、改密后旧 token 401、新密码可登录、专栏 sort 与文章绑定、公开列表不含草稿。
+
+### 未处理
+
+RSS、找回密码、邮箱验证、评论分页、图片灯箱、博主回复留言 —— 属于能力缺失而非缺陷，
+已在审计报告第 4 节登记。
+
+---
+
 ## 2026-11-03 · P5 + P6：后台完善与质量加固
 
 ### P5 后台

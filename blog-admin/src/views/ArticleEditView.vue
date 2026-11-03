@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Check, Promotion } from '@element-plus/icons-vue'
@@ -132,6 +132,15 @@ onMounted(async () => {
   }
   await load()
 })
+
+// 新建成功后 router.replace 到 /articles/:id/edit，组件会被复用，
+// onMounted 不再执行；这里监听 id 变化重新拉取，保证状态/内容与服务端一致。
+watch(
+  () => route.params.id,
+  (value) => {
+    if (value) load()
+  }
+)
 </script>
 
 <template>
@@ -183,9 +192,7 @@ onMounted(async () => {
                 v-model="form.tagIds"
                 multiple
                 filterable
-                allow-create
-                default-first-option
-                placeholder="选择标签"
+                placeholder="选择已有标签（新建标签请到「标签管理」）"
                 style="width: 100%"
               >
                 <el-option v-for="t in tags" :key="t.id" :label="t.name" :value="t.id" />

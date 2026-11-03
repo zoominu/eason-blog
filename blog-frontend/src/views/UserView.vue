@@ -1,16 +1,19 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Bell, Bookmark, LogOut, Save } from 'lucide-vue-next'
 import { authApi, interactionApi } from '@/api'
 import type { ArticleSummary, NotificationItem } from '@/api/types'
+import Pagination from '@/components/Pagination.vue'
 import { useUserStore } from '@/stores/user'
 import { formatDate, formatDateTime } from '@/utils/format'
 
+const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-const tab = ref<'profile' | 'favorites' | 'notifications'>('profile')
+type Tab = 'profile' | 'favorites' | 'notifications'
+const tab = ref<Tab>('profile')
 
 const nickname = ref('')
 const bio = ref('')
@@ -26,17 +29,22 @@ const pwdError = ref('')
 
 const favorites = ref<ArticleSummary[]>([])
 const favoriteTotal = ref(0)
+const favoritePage = ref(1)
+const favoritePages = ref(0)
 const loadingFavorites = ref(false)
 
 const notifications = ref<NotificationItem[]>([])
+const notificationLimit = ref(20)
 const loadingNotifications = ref(false)
 
-async function loadFavorites() {
+async function loadFavorites(pageNo = 1) {
   loadingFavorites.value = true
   try {
-    const page = await interactionApi.favorites(1, 20)
+    const page = await interactionApi.favorites(pageNo, 10)
     favorites.value = page.records
     favoriteTotal.value = page.total
+    favoritePage.value = page.current
+    favoritePages.value = page.pages
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -44,10 +52,11 @@ async function loadFavorites() {
   }
 }
 
-async function loadNotifications() {
+async function loadNotifications(limit = notificationLimit.value) {
   loadingNotifications.value = true
   try {
-    notifications.value = await interactionApi.notifications(30)
+    notificationLimit.value = limit
+    notifications.value = await interactionApi.notifications(limit)
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -55,10 +64,12 @@ async function loadNotifications() {
   }
 }
 
-async function switchTab(next: 'profile' | 'favorites' | 'notifications') {
+async function switchTab(next: Tab) {
   tab.value = next
-  if (next === 'favorites') await loadFavorites()
-  if (next === 'notifications') await loadNotifications()
+  // 标签页写进 URL，刷新/分享后仍停在对应页
+  router.replace({ path: '/user', query: next === 'profile' ? {} : { tab: next } })
+  if (next === 'favorites') await loadFavorites(1)
+  if (next === 'notifications') await loadNotifications(20)
 }
 
 async function markRead(item: NotificationItem) {
@@ -90,9 +101,12 @@ async function changePassword() {
   pwdError.value = ''
   try {
     await authApi.changePassword(oldPassword.value, newPassword.value)
+    // 改密后后端会递增 token 版本，旧 Cookie 已失效，这里直接退出避免“还在登录态”的错觉
     pwdMessage.value = '密码已修改，请重新登录'
     oldPassword.value = ''
     newPassword.value = ''
+    await userStore.logout()
+    setTimeout(() => router.replace('/login'), 800)
   } catch (e) {
     pwdError.value = (e as Error).message
   } finally {
@@ -109,7 +123,23 @@ onMounted(async () => {
   await userStore.fetchMe()
   nickname.value = userStore.user?.nickname ?? ''
   bio.value = userStore.user?.bio ?? ''
+
+  // 支持从页头「通知」直接跳 /user?tab=notifications
+  const requested = String(route.query.tab ?? '')
+  if (requested === 'notifications' || requested === 'favorites') {
+    await switchTab(requested as Tab)
+  }
 })
+
+watch(
+  () => route.query.tab,
+  (value) => {
+    if (value === 'notifications' || value === 'favorites') {
+      tab.value = value as Tab
+      value === 'favorites' ? loadFavorites(1) : loadNotifications(20)
+    }
+  }
+)
 </script>
 
 <template>
@@ -182,6 +212,7 @@ onMounted(async () => {
           <span class="fav__title">{{ item.title }}</span>
           <span class="fav__meta muted">{{ formatDate(item.publishTime) }} · {{ item.viewCount }} 次阅读</span>
         </RouterLink>
+        <Pagination :current="favoritePage" :pages="favoritePages" @change="loadFavorites" />
       </div>
       <p v-else class="muted">还没有收藏文章，在文章页点「收藏」即可。</p>
     </section>
@@ -202,6 +233,13 @@ onMounted(async () => {
             <span class="notice__time muted">{{ formatDateTime(item.createTime) }}</span>
           </span>
           <span class="notice__body muted">{{ item.content }}</span>
+        </button>
+        <button
+          v-if="notifications.length >= notificationLimit"
+          class="btn more"
+          @click="loadNotifications(notificationLimit + 20)"
+        >
+          加载更多
         </button>
       </div>
       <p v-else class="muted">暂无通知。</p>

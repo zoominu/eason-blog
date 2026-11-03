@@ -72,8 +72,11 @@ public class SecurityConfig {
                                 "/api/v1/tags/**",
                                 "/api/v1/columns/**",
                                 "/api/v1/search",
+                                "/api/v1/archive",
                                 "/api/v1/site/**",
                                 "/api/v1/guestbook",
+                                "/sitemap.xml",
+                                "/robots.txt",
                                 "/uploads/**").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/api/v1/users/**", "/api/v1/auth/me", "/api/v1/auth/logout").authenticated()

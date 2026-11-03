@@ -12,11 +12,24 @@ import bash from 'highlight.js/lib/languages/bash'
 import json from 'highlight.js/lib/languages/json'
 import xml from 'highlight.js/lib/languages/xml'
 import css from 'highlight.js/lib/languages/css'
-import { ArrowLeft, Bookmark, Calendar, Clock, Eye, Heart, MessageSquare, Send, Tag } from 'lucide-vue-next'
+import {
+  ArrowLeft,
+  Bookmark,
+  Calendar,
+  Clock,
+  Copy,
+  Eye,
+  Heart,
+  MessageSquare,
+  Send,
+  Share2
+} from 'lucide-vue-next'
 import { articleApi, interactionApi } from '@/api'
 import type { ArticleDetail, CommentItem, InteractionState } from '@/api/types'
+import CommentNode from '@/components/CommentNode.vue'
 import { useUserStore } from '@/stores/user'
 import { formatDate, formatCount } from '@/utils/format'
+import { applyArticleSeo, SITE_NAME } from '@/utils/seo'
 
 hljs.registerLanguage('java', java)
 hljs.registerLanguage('sql', sql)
@@ -41,6 +54,7 @@ const contentRef = ref<HTMLElement | null>(null)
 
 const interaction = ref<InteractionState>({ liked: false, favorited: false, likeCount: 0, commentCount: 0 })
 const comments = ref<CommentItem[]>([])
+const commentsError = ref('')
 const commentText = ref('')
 const replyTo = ref<CommentItem | null>(null)
 const submitting = ref(false)
@@ -49,35 +63,59 @@ const commentHint = ref('')
 marked.setOptions({ gfm: true, breaks: false })
 
 const readingLabel = computed(() => (article.value ? `${article.value.readingMinutes} 分钟` : ''))
+/** 评论数统一用互动接口的口径（含回复），避免与标题数字不一致 */
+const commentTotal = computed(() => (interaction.value.commentCount > 0
+  ? interaction.value.commentCount
+  : comments.value.length))
 
 async function load(slug: string) {
   loading.value = true
   error.value = ''
   headings.value = []
-  try {
-    const data = await articleApi.detail(slug)
-    article.value = data
-    // 先净化再插入 DOM：Markdown 可能包含原始 HTML，直接 v-html 等于开放 XSS
-    html.value = DOMPurify.sanitize(marked.parse(data.content) as string, {
-      USE_PROFILES: { html: true },
-      ADD_ATTR: ['target']
-    })
-    loading.value = false
-    await nextTick()
-    buildToc()
-    highlightCode()
-    applySeo(data)
-    window.scrollTo({ top: 0 })
+  comments.value = []
+  commentsError.value = ''
 
-    interaction.value = await interactionApi.status(data.id)
-    comments.value = await interactionApi.comments(slug)
+  // 正文与附属数据分开处理：互动/评论失败不应把整篇文章变成错误页
+  let data: ArticleDetail
+  try {
+    data = await articleApi.detail(slug)
   } catch (e) {
     error.value = (e as Error).message
     loading.value = false
+    return
+  }
+
+  article.value = data
+  html.value = DOMPurify.sanitize(marked.parse(data.content) as string, {
+    USE_PROFILES: { html: true },
+    ADD_ATTR: ['target']
+  })
+  loading.value = false
+  await nextTick()
+  buildToc()
+  highlightCode()
+  addCopyButtons()
+  applyArticleSeo(data)
+  window.scrollTo({ top: 0 })
+
+  // 以下两个请求互不影响，失败时降级为空状态
+  try {
+    interaction.value = await interactionApi.status(data.id)
+  } catch {
+    interaction.value = {
+      liked: false,
+      favorited: false,
+      likeCount: data.likeCount,
+      commentCount: data.commentCount
+    }
+  }
+  try {
+    comments.value = await interactionApi.comments(slug)
+  } catch (e) {
+    commentsError.value = (e as Error).message
   }
 }
 
-/** 代码高亮：只处理带语言标记的 ``` 代码块，其余保持纯文本 */
 function highlightCode() {
   const container = contentRef.value
   if (!container) return
@@ -88,32 +126,33 @@ function highlightCode() {
     try {
       hljs.highlightElement(el)
     } catch {
-      // 语言未注册时忽略，不影响阅读
+      // 语言未注册时忽略
     }
   })
 }
 
-/** 单页应用的 SEO：动态写入 title / description / OpenGraph */
-function applySeo(data: ArticleDetail) {
-  const title = data.seoTitle || data.title
-  document.title = `${title} · Eason Blog`
-
-  const setMeta = (selector: string, attr: string, value: string) => {
-    let el = document.head.querySelector(selector) as HTMLMetaElement | null
-    if (!el) {
-      el = document.createElement('meta')
-      const [key, val] = selector.replace(/[[\]']/g, '').split('=')
-      el.setAttribute(key, val)
-      document.head.appendChild(el)
-    }
-    el.setAttribute(attr, value)
-  }
-
-  const description = data.seoDescription || data.summary || ''
-  if (description) setMeta('meta[name="description"]', 'content', description)
-  setMeta('meta[property="og:title"]', 'content', title)
-  if (description) setMeta('meta[property="og:description"]', 'content', description)
-  setMeta('meta[property="og:type"]', 'content', 'article')
+/** 给每个代码块加「复制」按钮 */
+function addCopyButtons() {
+  const container = contentRef.value
+  if (!container) return
+  container.querySelectorAll('pre').forEach((pre) => {
+    if (pre.querySelector('.code-copy')) return
+    const button = document.createElement('button')
+    button.className = 'code-copy'
+    button.type = 'button'
+    button.textContent = '复制'
+    button.addEventListener('click', async () => {
+      const code = pre.querySelector('code')?.textContent ?? ''
+      try {
+        await navigator.clipboard.writeText(code)
+        button.textContent = '已复制'
+        setTimeout(() => (button.textContent = '复制'), 1500)
+      } catch {
+        button.textContent = '复制失败'
+      }
+    })
+    pre.appendChild(button)
+  })
 }
 
 function buildToc() {
@@ -157,17 +196,43 @@ function requireLogin(): boolean {
 
 async function toggleLike() {
   if (!requireLogin() || !article.value) return
-  interaction.value = interaction.value.liked
-    ? await interactionApi.unlike(article.value.id)
-    : await interactionApi.like(article.value.id)
-  if (article.value) article.value.likeCount = interaction.value.likeCount
+  try {
+    interaction.value = interaction.value.liked
+      ? await interactionApi.unlike(article.value.id)
+      : await interactionApi.like(article.value.id)
+  } catch (e) {
+    commentHint.value = (e as Error).message
+  }
 }
 
 async function toggleFavorite() {
   if (!requireLogin() || !article.value) return
-  interaction.value = interaction.value.favorited
-    ? await interactionApi.unfavorite(article.value.id)
-    : await interactionApi.favorite(article.value.id)
+  try {
+    interaction.value = interaction.value.favorited
+      ? await interactionApi.unfavorite(article.value.id)
+      : await interactionApi.favorite(article.value.id)
+  } catch (e) {
+    commentHint.value = (e as Error).message
+  }
+}
+
+async function share() {
+  const url = window.location.href
+  const title = article.value?.title ?? SITE_NAME
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, url })
+      return
+    } catch {
+      // 用户取消，继续走复制
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url)
+    commentHint.value = '链接已复制'
+  } catch {
+    commentHint.value = url
+  }
 }
 
 function startReply(comment: CommentItem) {
@@ -233,11 +298,20 @@ watch(
     <template v-else-if="article">
       <header class="head">
         <div class="head__meta">
-          <span v-if="article.categoryName" class="tag-chip">{{ article.categoryName }}</span>
+          <RouterLink
+            v-if="article.categoryName && article.categorySlug"
+            :to="`/category/${article.categorySlug}`"
+            class="tag-chip"
+          >
+            {{ article.categoryName }}
+          </RouterLink>
           <span class="muted">{{ formatDate(article.publishTime) }}</span>
         </div>
         <h1>{{ article.title }}</h1>
         <p class="summary">{{ article.summary }}</p>
+
+        <img v-if="article.cover" :src="article.cover" class="cover" :alt="article.title" />
+
         <div class="meta muted">
           <span><Calendar :size="14" /> {{ formatDate(article.publishTime) }}</span>
           <span><Clock :size="14" /> {{ readingLabel }}</span>
@@ -264,8 +338,14 @@ watch(
 
       <footer class="foot">
         <div v-if="article.tags.length" class="tags">
-          <Tag :size="14" class="muted" />
-          <span v-for="tag in article.tags" :key="tag" class="tag-chip">{{ tag }}</span>
+          <RouterLink
+            v-for="(tag, index) in article.tags"
+            :key="tag"
+            :to="`/tag/${article.tagSlugs[index] ?? tag}`"
+            class="tag-chip tag-link"
+          >
+            # {{ tag }}
+          </RouterLink>
         </div>
 
         <div class="actions">
@@ -278,36 +358,46 @@ watch(
             {{ interaction.favorited ? '已收藏' : '收藏' }}
           </button>
           <a class="action" href="#comments">
-            <MessageSquare :size="16" /> 评论 {{ interaction.commentCount }}
+            <MessageSquare :size="16" /> 评论 {{ commentTotal }}
           </a>
+          <button class="action" @click="share">
+            <Share2 :size="16" /> 分享
+          </button>
         </div>
 
         <p class="muted updated">最后更新：{{ formatDate(article.updateTime) }}</p>
       </footer>
 
+      <nav class="neighbours">
+        <RouterLink v-if="article.prevSlug" :to="`/article/${article.prevSlug}`" class="neighbour">
+          <span class="neighbour__label">上一篇</span>
+          <span class="neighbour__title">{{ article.prevTitle }}</span>
+        </RouterLink>
+        <span v-else class="neighbour neighbour--empty" />
+        <RouterLink
+          v-if="article.nextSlug"
+          :to="`/article/${article.nextSlug}`"
+          class="neighbour neighbour--next"
+        >
+          <span class="neighbour__label">下一篇</span>
+          <span class="neighbour__title">{{ article.nextTitle }}</span>
+        </RouterLink>
+      </nav>
+
       <section id="comments" class="comments">
-        <h2 class="comments__title">评论 {{ comments.length ? `(${comments.length})` : '' }}</h2>
+        <h2 class="comments__title">评论 {{ commentTotal ? `(${commentTotal})` : '' }}</h2>
 
-        <div v-if="comments.length" class="comment-list">
-          <div v-for="comment in comments" :key="comment.id" class="comment">
-            <div class="comment__head">
-              <span class="comment__name">{{ comment.nickname }}</span>
-              <span class="muted comment__time">{{ formatDate(comment.createTime) }}</span>
-            </div>
-            <p class="comment__content">{{ comment.content }}</p>
-            <button class="comment__reply" @click="startReply(comment)">回复</button>
-
-            <div v-if="comment.replies.length" class="replies">
-              <div v-for="reply in comment.replies" :key="reply.id" class="comment comment--reply">
-                <div class="comment__head">
-                  <span class="comment__name">{{ reply.nickname }}</span>
-                  <span class="muted comment__time">{{ formatDate(reply.createTime) }}</span>
-                </div>
-                <p class="comment__content">{{ reply.content }}</p>
-                <button class="comment__reply" @click="startReply(reply)">回复</button>
-              </div>
-            </div>
-          </div>
+        <p v-if="commentsError" class="muted comments__empty">
+          评论加载失败：{{ commentsError }}（正文不受影响）
+        </p>
+        <div v-else-if="comments.length" class="comment-list">
+          <CommentNode
+            v-for="comment in comments"
+            :key="comment.id"
+            :comment="comment"
+            :depth="0"
+            @reply="startReply"
+          />
         </div>
         <p v-else class="muted comments__empty">还没有评论，来说点什么吧。</p>
 
@@ -394,6 +484,14 @@ watch(
   font-size: 16px;
 }
 
+.cover {
+  width: 100%;
+  margin-top: 20px;
+  border-radius: 14px;
+  max-height: 380px;
+  object-fit: cover;
+}
+
 .meta {
   display: flex;
   gap: 16px;
@@ -468,6 +566,11 @@ watch(
   flex-wrap: wrap;
 }
 
+.tag-link:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 .actions {
   display: flex;
   gap: 10px;
@@ -505,6 +608,45 @@ watch(
   margin: 16px 0 0;
 }
 
+.neighbours {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 28px;
+}
+
+.neighbour {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  transition: border-color 0.15s ease;
+}
+
+.neighbour:hover {
+  border-color: var(--accent);
+}
+
+.neighbour--next {
+  text-align: right;
+}
+
+.neighbour--empty {
+  border: none;
+}
+
+.neighbour__label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.neighbour__title {
+  font-size: 14px;
+  color: var(--fg-soft);
+}
+
 .comments {
   margin-top: 40px;
   padding-top: 24px;
@@ -519,60 +661,7 @@ watch(
 .comment-list {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-}
-
-.comment {
-  padding-bottom: 14px;
-  border-bottom: 1px dashed var(--border);
-}
-
-.comment__head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 6px;
-}
-
-.comment__name {
-  font-weight: 600;
-  font-size: 14px;
-}
-
-.comment__time {
-  font-size: 12px;
-}
-
-.comment__content {
-  margin: 0;
-  font-size: 14px;
-  color: var(--fg-soft);
-  line-height: 1.7;
-  white-space: pre-wrap;
-}
-
-.comment__reply {
-  margin-top: 6px;
-  border: none;
-  background: none;
-  padding: 0;
-  font-size: 12px;
-  color: var(--accent);
-  cursor: pointer;
-}
-
-.replies {
-  margin-top: 12px;
-  padding-left: 16px;
-  border-left: 2px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.comment--reply {
-  border-bottom: none;
-  padding-bottom: 0;
+  gap: 16px;
 }
 
 .comments__empty {
@@ -651,6 +740,10 @@ watch(
 
   .toc {
     display: none;
+  }
+
+  .neighbours {
+    grid-template-columns: 1fr;
   }
 }
 </style>

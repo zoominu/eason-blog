@@ -1,44 +1,59 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from 'lucide-vue-next'
 import { taxonomyApi } from '@/api'
-import type { ArticleSummary, PageResult } from '@/api/types'
+import type { ArticleSummary, Category, PageResult } from '@/api/types'
 import ArticleCard from '@/components/ArticleCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import Pagination from '@/components/Pagination.vue'
 
 const route = useRoute()
+const router = useRouter()
+
+const category = ref<Category | null>(null)
 const page = ref<PageResult<ArticleSummary> | null>(null)
 const loading = ref(true)
 const error = ref('')
 
-async function load(slug: string, pageNo = 1) {
+const slug = computed(() => String(route.params.slug))
+const currentPage = computed(() => Number(route.query.page ?? 1))
+
+async function load() {
   loading.value = true
   error.value = ''
   try {
-    page.value = await taxonomyApi.categoryArticles(slug, pageNo, 10)
+    // 分类名/描述单独取，避免“分类下没有文章时标题退化成分类文章”
+    const [detail, articles] = await Promise.all([
+      taxonomyApi.category(slug.value),
+      taxonomyApi.categoryArticles(slug.value, currentPage.value, 10)
+    ])
+    category.value = detail
+    page.value = articles
   } catch (e) {
     error.value = (e as Error).message
+    category.value = null
+    page.value = null
   } finally {
     loading.value = false
   }
 }
 
-onMounted(() => load(String(route.params.slug)))
+function goPage(next: number) {
+  router.push({ path: `/category/${slug.value}`, query: { page: String(next) } })
+}
 
-watch(
-  () => route.params.slug,
-  (slug) => slug && load(String(slug))
-)
+onMounted(load)
+watch(() => [route.params.slug, route.query.page], load)
 </script>
 
 <template>
   <div class="container">
     <RouterLink to="/categories" class="back"><ArrowLeft :size="15" /> 全部分类</RouterLink>
+
     <header class="head">
-      <h1>{{ page?.records[0]?.categoryName || '分类文章' }}</h1>
-      <p class="muted">共 {{ page?.total ?? 0 }} 篇</p>
+      <h1>{{ category?.name || '分类' }}</h1>
+      <p class="muted">{{ category?.description || `共 ${page?.total ?? 0} 篇文章` }}</p>
     </header>
 
     <p v-if="error" class="error">{{ error }}</p>
@@ -49,7 +64,7 @@ watch(
       <div class="grid">
         <ArticleCard v-for="article in page.records" :key="article.id" :article="article" />
       </div>
-      <Pagination :current="page.current" :pages="page.pages" @change="(p) => load(String(route.params.slug), p)" />
+      <Pagination :current="page.current" :pages="page.pages" @change="goPage" />
     </template>
     <EmptyState v-else title="该分类下暂无文章" />
   </div>

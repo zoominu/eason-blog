@@ -12,9 +12,9 @@ export const useUserStore = defineStore('user', {
     isAdmin: (state) => state.user?.roles.includes('SUPER_ADMIN') ?? false
   },
   actions: {
-    /** 应用启动时调用一次，恢复登录态；401 属于正常情况，不视为错误。 */
-    async fetchMe() {
-      if (this.initialized) return
+    /** 恢复登录态；返回当前用户（未登录为 null），供路由守卫判断。 */
+    async fetchMe(): Promise<User | null> {
+      if (this.initialized) return this.user
       try {
         this.user = await authApi.me()
       } catch {
@@ -22,6 +22,7 @@ export const useUserStore = defineStore('user', {
       } finally {
         this.initialized = true
       }
+      return this.user
     },
     async login(email: string, password: string) {
       this.user = await authApi.login(email, password)

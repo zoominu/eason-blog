@@ -155,10 +155,23 @@ public class AdminArticleService {
         validateRelations(request);
 
         applyFields(article, request, id);
-        // 草稿直接发布时补上发布时间；已发布的文章保留原发布时间
-        if (article.getStatus() != null && article.getStatus() == PUBLISHED && article.getPublishTime() == null) {
+
+        // 明确处理状态迁移，让后台「保存草稿 / 保存并发布」的语义与按钮一致
+        if (request.status() != null) {
+            if (request.status() == PUBLISHED) {
+                article.setStatus(PUBLISHED);
+                if (article.getPublishTime() == null) {
+                    article.setPublishTime(LocalDateTime.now());
+                }
+            } else if (article.getStatus() != null && article.getStatus() == PUBLISHED) {
+                // 已发布文章点「保存草稿」= 撤回为草稿（下架）
+                article.setStatus(DRAFT);
+            }
+        } else if (article.getStatus() != null && article.getStatus() == PUBLISHED
+                && article.getPublishTime() == null) {
             article.setPublishTime(LocalDateTime.now());
         }
+
         article.setUpdateTime(LocalDateTime.now());
         articleMapper.updateById(article);
 

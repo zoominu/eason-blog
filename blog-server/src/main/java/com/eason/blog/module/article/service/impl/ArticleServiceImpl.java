@@ -9,6 +9,7 @@ import com.eason.blog.module.article.entity.Article;
 import com.eason.blog.module.article.mapper.ArticleMapper;
 import com.eason.blog.module.article.mapper.ArticleTagMapper;
 import com.eason.blog.module.article.service.ArticleService;
+import com.eason.blog.module.article.service.ArticleTagResolver;
 import com.eason.blog.module.article.vo.ArticleDetailVO;
 import com.eason.blog.module.article.vo.ArticleSummaryVO;
 import com.eason.blog.module.category.entity.Category;
@@ -38,13 +39,16 @@ public class ArticleServiceImpl implements ArticleService {
     private final ArticleMapper articleMapper;
     private final ArticleTagMapper articleTagMapper;
     private final CategoryMapper categoryMapper;
+    private final ArticleTagResolver tagResolver;
 
     public ArticleServiceImpl(ArticleMapper articleMapper,
                               ArticleTagMapper articleTagMapper,
-                              CategoryMapper categoryMapper) {
+                              CategoryMapper categoryMapper,
+                              ArticleTagResolver tagResolver) {
         this.articleMapper = articleMapper;
         this.articleTagMapper = articleTagMapper;
         this.categoryMapper = categoryMapper;
+        this.tagResolver = tagResolver;
     }
 
     @Override
@@ -77,8 +81,7 @@ public class ArticleServiceImpl implements ArticleService {
 
         Page<Article> page = new Page<>(query.pageOrDefault(), query.sizeOrDefault());
         articleMapper.selectPage(page, wrapper);
-        Map<Long, String> categoryNames = loadCategoryNames(page.getRecords());
-        return PageResult.of(page, article -> toSummary(article, categoryNames));
+        return PageResult.of(page, summaryMapper(page.getRecords()));
     }
 
     @Override
@@ -94,8 +97,7 @@ public class ArticleServiceImpl implements ArticleService {
                 .eq(Article::getVisibility, PUBLIC_VISIBILITY)
                 .orderByDesc(Article::getIsTop)
                 .orderByDesc(Article::getPublishTime));
-        Map<Long, String> categoryNames = loadCategoryNames(page.getRecords());
-        return PageResult.of(page, a -> toSummary(a, categoryNames));
+        return PageResult.of(page, summaryMapper(page.getRecords()));
     }
 
     @Override
@@ -105,8 +107,8 @@ public class ArticleServiceImpl implements ArticleService {
                 .eq(Article::getStatus, PUBLIC_STATUS)
                 .eq(Article::getVisibility, PUBLIC_VISIBILITY)
                 .orderByDesc(Article::getPublishTime));
-        Map<Long, String> categoryNames = loadCategoryNames(page.getRecords());
-        return page.getRecords().stream().map(a -> toSummary(a, categoryNames)).toList();
+        var mapper = summaryMapper(page.getRecords());
+        return page.getRecords().stream().map(mapper).toList();
     }
 
     @Override
@@ -117,8 +119,8 @@ public class ArticleServiceImpl implements ArticleService {
                 .eq(Article::getVisibility, PUBLIC_VISIBILITY)
                 .eq(Article::getIsRecommend, 1)
                 .orderByDesc(Article::getPublishTime));
-        Map<Long, String> categoryNames = loadCategoryNames(page.getRecords());
-        return page.getRecords().stream().map(a -> toSummary(a, categoryNames)).toList();
+        var mapper = summaryMapper(page.getRecords());
+        return page.getRecords().stream().map(mapper).toList();
     }
 
     @Override
@@ -137,7 +139,11 @@ public class ArticleServiceImpl implements ArticleService {
         }
 
         List<Tag> tags = articleTagMapper.selectTagsByArticleId(article.getId());
-        String categoryName = categoryName(article.getCategoryId());
+        Category category = article.getCategoryId() == null ? null : categoryMapper.selectById(article.getCategoryId());
+        String categoryName = category == null ? null : category.getName();
+        String categorySlug = category == null ? null : category.getSlug();
+        Article prev = neighbour(article, true);
+        Article next = neighbour(article, false);
 
         return new ArticleDetailVO(
                 article.getId(),
@@ -147,7 +153,9 @@ public class ArticleServiceImpl implements ArticleService {
                 article.getCover(),
                 article.getCategoryId(),
                 categoryName,
+                categorySlug,
                 tags.stream().map(Tag::getName).toList(),
+                tags.stream().map(Tag::getSlug).toList(),
                 article.getContent(),
                 viewCount,
                 nullSafe(article.getLikeCount()),
@@ -156,10 +164,39 @@ public class ArticleServiceImpl implements ArticleService {
                 article.getPublishTime(),
                 article.getUpdateTime(),
                 article.getSeoTitle(),
-                article.getSeoDescription());
+                article.getSeoDescription(),
+                prev == null ? null : prev.getSlug(),
+                prev == null ? null : prev.getTitle(),
+                next == null ? null : next.getSlug(),
+                next == null ? null : next.getTitle());
     }
 
-    private ArticleSummaryVO toSummary(Article article, Map<Long, String> categoryNames) {
+    /** 上一篇 / 下一篇：按发布时间排序的相邻公开文章。 */
+    private Article neighbour(Article current, boolean previous) {
+        var wrapper = Wrappers.<Article>lambdaQuery()
+                .eq(Article::getStatus, PUBLIC_STATUS)
+                .eq(Article::getVisibility, PUBLIC_VISIBILITY)
+                .isNotNull(Article::getPublishTime)
+                .last("limit 1");
+        if (previous) {
+            wrapper.lt(Article::getPublishTime, current.getPublishTime())
+                    .orderByDesc(Article::getPublishTime);
+        } else {
+            wrapper.gt(Article::getPublishTime, current.getPublishTime())
+                    .orderByAsc(Article::getPublishTime);
+        }
+        return articleMapper.selectOne(wrapper);
+    }
+
+    private java.util.function.Function<Article, ArticleSummaryVO> summaryMapper(List<Article> articles) {
+        Map<Long, String> categoryNames = loadCategoryNames(articles);
+        Map<Long, List<String>> tagNames = tagResolver.byArticleIds(
+                articles.stream().map(Article::getId).toList());
+        return article -> toSummary(article, categoryNames, tagNames);
+    }
+
+    private ArticleSummaryVO toSummary(Article article, Map<Long, String> categoryNames,
+                                       Map<Long, List<String>> tagNames) {
         return new ArticleSummaryVO(
                 article.getId(),
                 article.getTitle(),
@@ -168,7 +205,7 @@ public class ArticleServiceImpl implements ArticleService {
                 article.getCover(),
                 article.getCategoryId(),
                 article.getCategoryId() == null ? null : categoryNames.get(article.getCategoryId()),
-                List.of(),
+                tagNames.getOrDefault(article.getId(), List.of()),
                 article.getIsTop() != null && article.getIsTop() == 1,
                 article.getIsRecommend() != null && article.getIsRecommend() == 1,
                 nullSafe(article.getViewCount()),

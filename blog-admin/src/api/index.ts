@@ -70,7 +70,11 @@ export const columnApi = {
     post<{ id: number }>('/admin/columns', payload),
   update: (id: number, payload: { name: string; slug?: string; description?: string; cover?: string; sort?: number }) =>
     patch<void>(`/admin/columns/${id}`, payload),
-  remove: (id: number) => del<void>(`/admin/columns/${id}`)
+  remove: (id: number) => del<void>(`/admin/columns/${id}`),
+  articles: (id: number) =>
+    get<{ id: number; title: string; status: number; sort: number }[]>(`/admin/columns/${id}/articles`),
+  setArticles: (id: number, articleIds: number[]) =>
+    instance.put(`/api/v1/admin/columns/${id}/articles`, { articleIds }).then(() => undefined)
 }
 
 export interface AdminComment {

@@ -31,6 +31,8 @@ export const articleApi = {
 
 export const taxonomyApi = {
   categories: () => get<Category[]>('/categories'),
+  category: (slug: string) => get<Category>(`/categories/${slug}`),
+  archive: () => get<{ month: string; total: number }[]>('/archive'),
   categoryArticles: (slug: string, page = 1, size = 10) =>
     get<PageResult<ArticleSummary>>(`/categories/${slug}/articles`, { page, size }),
   tags: () => get<Tag[]>('/tags'),

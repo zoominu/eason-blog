@@ -45,7 +45,8 @@ public class AdminColumnService {
                         .orderByAsc(Column::getId))
                 .stream()
                 .map(c -> new ColumnVO(c.getId(), c.getName(), c.getSlug(), c.getDescription(),
-                        c.getCover(), counts.getOrDefault(c.getId(), 0L).intValue()))
+                        c.getCover(), counts.getOrDefault(c.getId(), 0L).intValue(),
+                        c.getSort() == null ? 0 : c.getSort()))
                 .toList();
     }
 
@@ -113,5 +114,60 @@ public class AdminColumnService {
             throw BusinessException.notFound("专栏不存在");
         }
         return column;
+    }
+
+    /** 专栏内的文章（后台，含草稿），按 sort 升序。 */
+    public List<com.eason.blog.module.column.vo.ColumnArticleItemVO> articles(Long columnId) {
+        require(columnId);
+        List<ColumnArticle> relations = columnArticleMapper.selectList(
+                Wrappers.<ColumnArticle>lambdaQuery()
+                        .eq(ColumnArticle::getColumnId, columnId)
+                        .orderByAsc(ColumnArticle::getSort));
+        if (relations.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, com.eason.blog.module.article.entity.Article> byId = articleMapper
+                .selectBatchIds(relations.stream().map(ColumnArticle::getArticleId).toList())
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        com.eason.blog.module.article.entity.Article::getId, a -> a));
+
+        return relations.stream()
+                .map(r -> {
+                    var article = byId.get(r.getArticleId());
+                    return new com.eason.blog.module.column.vo.ColumnArticleItemVO(
+                            r.getArticleId(),
+                            article == null ? "（已删除）" : article.getTitle(),
+                            article == null ? null : article.getStatus(),
+                            r.getSort());
+                })
+                .toList();
+    }
+
+    /** 全量替换专栏文章及顺序（articleIds 的顺序即阅读顺序）。 */
+    @Transactional
+    public void setArticles(Long columnId, List<Long> articleIds) {
+        require(columnId);
+        List<Long> distinct = articleIds == null ? List.of()
+                : articleIds.stream().filter(java.util.Objects::nonNull).distinct().toList();
+        if (!distinct.isEmpty()) {
+            long found = articleMapper.selectCount(Wrappers.<com.eason.blog.module.article.entity.Article>lambdaQuery()
+                    .in(com.eason.blog.module.article.entity.Article::getId, distinct));
+            if (found != distinct.size()) {
+                throw BusinessException.badRequest("存在无效的文章 id");
+            }
+        }
+
+        columnArticleMapper.delete(Wrappers.<ColumnArticle>lambdaQuery()
+                .eq(ColumnArticle::getColumnId, columnId));
+        int sort = 1;
+        for (Long articleId : distinct) {
+            ColumnArticle relation = new ColumnArticle();
+            relation.setColumnId(columnId);
+            relation.setArticleId(articleId);
+            relation.setSort(sort++);
+            relation.setCreateTime(LocalDateTime.now());
+            columnArticleMapper.insert(relation);
+        }
     }
 }

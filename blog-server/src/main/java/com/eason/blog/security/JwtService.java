@@ -41,12 +41,17 @@ public class JwtService {
         this.expireMinutes = Math.max(1, properties.jwt().expireMinutes());
     }
 
-    public String issue(Long userId, String email, List<String> roles) {
+    /**
+     * 签发 token。ver 是用户当前的 token_version，
+     * 改密后该值自增，旧 token 在过滤器里会被判定为失效。
+     */
+    public String issue(Long userId, String email, List<String> roles, int tokenVersion) {
         Instant now = Instant.now();
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("email", email)
                 .claim("roles", roles)
+                .claim("ver", tokenVersion)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusSeconds(expireMinutes * 60)))
                 .signWith(key)

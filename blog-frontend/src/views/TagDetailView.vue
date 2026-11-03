@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from 'lucide-vue-next'
 import { taxonomyApi } from '@/api'
 import type { ArticleSummary, PageResult } from '@/api/types'
@@ -9,27 +9,31 @@ import EmptyState from '@/components/EmptyState.vue'
 import Pagination from '@/components/Pagination.vue'
 
 const route = useRoute()
+const router = useRouter()
 const page = ref<PageResult<ArticleSummary> | null>(null)
 const tagName = ref('')
 const loading = ref(true)
 const error = ref('')
 
+const slug = computed(() => String(route.params.slug))
+const currentPage = computed(() => Number(route.query.page ?? 1))
+
 /** 路由里只有 slug，展示时换成真实标签名更友好；失败则退回 slug。 */
-async function resolveTagName(slug: string) {
+async function resolveTagName() {
   try {
     const tags = await taxonomyApi.tags()
-    tagName.value = tags.find((tag) => tag.slug === slug)?.name ?? slug
+    tagName.value = tags.find((tag) => tag.slug === slug.value)?.name ?? slug.value
   } catch {
-    tagName.value = slug
+    tagName.value = slug.value
   }
 }
 
-async function load(slug: string, pageNo = 1) {
+async function load() {
   loading.value = true
   error.value = ''
   try {
-    page.value = await taxonomyApi.tagArticles(slug, pageNo, 10)
-    await resolveTagName(slug)
+    page.value = await taxonomyApi.tagArticles(slug.value, currentPage.value, 10)
+    await resolveTagName()
   } catch (e) {
     error.value = (e as Error).message
   } finally {
@@ -37,12 +41,12 @@ async function load(slug: string, pageNo = 1) {
   }
 }
 
-onMounted(() => load(String(route.params.slug)))
+function goPage(next: number) {
+  router.push({ path: `/tag/${slug.value}`, query: { page: String(next) } })
+}
 
-watch(
-  () => route.params.slug,
-  (slug) => slug && load(String(slug))
-)
+onMounted(load)
+watch(() => [route.params.slug, route.query.page], load)
 </script>
 
 <template>
@@ -61,7 +65,7 @@ watch(
       <div class="grid">
         <ArticleCard v-for="article in page.records" :key="article.id" :article="article" />
       </div>
-      <Pagination :current="page.current" :pages="page.pages" @change="(p) => load(String(route.params.slug), p)" />
+      <Pagination :current="page.current" :pages="page.pages" @change="goPage" />
     </template>
     <EmptyState v-else title="该标签下暂无文章" />
   </div>

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { columnApi } from '@/api'
+import { columnApi, articleApi } from '@/api'
 import type { Column } from '@/api/types'
 
 const list = ref<Column[]>([])
@@ -37,9 +37,46 @@ function openEdit(row: Column) {
     slug: row.slug,
     description: row.description ?? '',
     cover: row.cover ?? '',
-    sort: 0
+    // 回填排序：之前固定写 0，保存一次就把原有顺序重置了
+    sort: row.sort ?? 0
   })
   dialogVisible.value = true
+}
+
+const articleDialogVisible = ref(false)
+const articleOptions = ref<{ id: number; title: string }[]>([])
+const selectedArticleIds = ref<number[]>([])
+const editingColumn = ref<Column | null>(null)
+const savingArticles = ref(false)
+
+async function openArticles(row: Column) {
+  editingColumn.value = row
+  articleDialogVisible.value = true
+  try {
+    const [page, linked] = await Promise.all([
+      articleApi.page({ page: 1, size: 50 }),
+      columnApi.articles(row.id)
+    ])
+    articleOptions.value = page.records.map((a) => ({ id: a.id, title: a.title }))
+    selectedArticleIds.value = linked.map((a) => a.id)
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  }
+}
+
+async function saveArticles() {
+  if (!editingColumn.value) return
+  savingArticles.value = true
+  try {
+    await columnApi.setArticles(editingColumn.value.id, selectedArticleIds.value)
+    ElMessage.success('专栏文章已更新')
+    articleDialogVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    savingArticles.value = false
+  }
 }
 
 async function submit() {
@@ -105,8 +142,9 @@ onMounted(load)
           </template>
         </el-table-column>
         <el-table-column prop="articleCount" label="文章数" width="100" />
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
+            <el-button link type="primary" @click="openArticles(row)">文章</el-button>
             <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="danger" @click="remove(row)">删除</el-button>
           </template>
@@ -137,6 +175,23 @@ onMounted(load)
         <el-button type="primary" :loading="saving" @click="submit">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="articleDialogVisible" :title="`管理文章 · ${editingColumn?.name ?? ''}`" width="560px">
+      <p class="muted hint">选择顺序即专栏内的阅读顺序，可多选。</p>
+      <el-select
+        v-model="selectedArticleIds"
+        multiple
+        filterable
+        placeholder="选择文章"
+        style="width: 100%"
+      >
+        <el-option v-for="a in articleOptions" :key="a.id" :label="a.title" :value="a.id" />
+      </el-select>
+      <template #footer>
+        <el-button @click="articleDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="savingArticles" @click="saveArticles">保存</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -147,5 +202,10 @@ onMounted(load)
 
 .muted {
   color: var(--admin-muted);
+}
+
+.hint {
+  margin: 0 0 10px;
+  font-size: 13px;
 }
 </style>

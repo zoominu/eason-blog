@@ -7,6 +7,7 @@ import com.eason.blog.common.response.PageResult;
 import com.eason.blog.common.security.RateLimiter;
 import com.eason.blog.module.article.entity.Article;
 import com.eason.blog.module.article.mapper.ArticleMapper;
+import com.eason.blog.module.article.service.ArticleTagResolver;
 import com.eason.blog.module.article.vo.ArticleSummaryVO;
 import com.eason.blog.module.category.entity.Category;
 import com.eason.blog.module.category.mapper.CategoryMapper;
@@ -67,6 +68,7 @@ public class InteractionService {
     private final UserMapper userMapper;
     private final CategoryMapper categoryMapper;
     private final RateLimiter rateLimiter;
+    private final ArticleTagResolver tagResolver;
 
     public InteractionService(ArticleMapper articleMapper,
                               CommentMapper commentMapper,
@@ -76,7 +78,8 @@ public class InteractionService {
                               GuestbookMapper guestbookMapper,
                               UserMapper userMapper,
                               CategoryMapper categoryMapper,
-                              RateLimiter rateLimiter) {
+                              RateLimiter rateLimiter,
+                              ArticleTagResolver tagResolver) {
         this.articleMapper = articleMapper;
         this.commentMapper = commentMapper;
         this.favoriteMapper = favoriteMapper;
@@ -86,6 +89,7 @@ public class InteractionService {
         this.userMapper = userMapper;
         this.categoryMapper = categoryMapper;
         this.rateLimiter = rateLimiter;
+        this.tagResolver = tagResolver;
     }
 
     // ------------------------------------------------------------------ 评论
@@ -162,7 +166,9 @@ public class InteractionService {
 
         // 通知文章作者（本站只有一个作者，即管理员）
         notify(article.getAuthorId(), "COMMENT", "收到新评论",
-                nickname + " 评论了《" + article.getTitle() + "》，待审核", "/admin/comments");
+                nickname + " 评论了《" + article.getTitle() + "》，待审核",
+                // 读者端没有 /admin 路由，统一落到个人中心通知页，避免 404
+                "/user");
         if (parent != null && !Objects.equals(parent.getUserId(), userId)) {
             notify(parent.getUserId(), "REPLY", "有人回复了你的评论",
                     nickname + " 回复了你在《" + article.getTitle() + "》下的评论", "/article/" + article.getSlug());
@@ -242,6 +248,12 @@ public class InteractionService {
         return interaction(userId, articleId);
     }
 
+    /**
+     * 我的收藏。
+     *
+     * <p>只返回仍然公开可读的文章：文章被下线或改为私密后，收藏列表不能再暴露标题与摘要，
+     * 同时把 total 调整为“可读收藏数”，避免出现空白页。</p>
+     */
     public PageResult<ArticleSummaryVO> favorites(Long userId, int pageNo, int size) {
         Page<Favorite> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 50));
         favoriteMapper.selectPage(page, Wrappers.<Favorite>lambdaQuery()
@@ -250,16 +262,27 @@ public class InteractionService {
         if (page.getRecords().isEmpty()) {
             return PageResult.empty(pageNo, size);
         }
-        List<Long> ids = page.getRecords().stream().map(Favorite::getArticleId).toList();
-        Map<Long, Article> articles = articleMapper.selectBatchIds(ids).stream()
-                .collect(Collectors.toMap(Article::getId, Function.identity()));
 
-        List<ArticleSummaryVO> records = ids.stream()
-                .map(articles::get)
+        List<Long> favoriteIds = page.getRecords().stream().map(Favorite::getArticleId).toList();
+        List<Article> readable = articleMapper.selectList(Wrappers.<Article>lambdaQuery()
+                .in(Article::getId, favoriteIds)
+                .eq(Article::getStatus, 1)
+                .eq(Article::getVisibility, 0));
+
+        // 按收藏时间顺序还原
+        Map<Long, Article> byId = readable.stream()
+                .collect(Collectors.toMap(Article::getId, Function.identity()));
+        Map<Long, List<String>> tagNames = tagResolver.byArticleIds(readable.stream()
+                .map(Article::getId).toList());
+
+        List<ArticleSummaryVO> records = favoriteIds.stream()
+                .map(byId::get)
                 .filter(Objects::nonNull)
-                .map(this::toSummary)
+                .map(a -> toSummary(a, tagNames.getOrDefault(a.getId(), List.of())))
                 .toList();
-        return new PageResult<>(records, page.getTotal(), page.getCurrent(), page.getSize(), page.getPages());
+
+        long total = Math.max(0, page.getTotal() - (favoriteIds.size() - records.size()));
+        return new PageResult<>(records, total, page.getCurrent(), page.getSize(), page.getPages());
     }
 
     // ----------------------------------------------------------------- 通知
@@ -445,11 +468,11 @@ public class InteractionService {
                 .collect(Collectors.toMap(User::getId, Function.identity()));
     }
 
-    private ArticleSummaryVO toSummary(Article a) {
+    private ArticleSummaryVO toSummary(Article a, List<String> tags) {
         Category category = a.getCategoryId() == null ? null : categoryMapper.selectById(a.getCategoryId());
         return new ArticleSummaryVO(
                 a.getId(), a.getTitle(), a.getSlug(), a.getSummary(), a.getCover(),
-                a.getCategoryId(), category == null ? null : category.getName(), List.of(),
+                a.getCategoryId(), category == null ? null : category.getName(), tags,
                 a.getIsTop() != null && a.getIsTop() == 1,
                 a.getIsRecommend() != null && a.getIsRecommend() == 1,
                 a.getViewCount() == null ? 0 : a.getViewCount(),

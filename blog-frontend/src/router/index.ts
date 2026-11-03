@@ -1,5 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
+import { useUserStore } from '@/stores/user'
+import { resetSeo } from '@/utils/seo'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -39,13 +41,22 @@ const router = createRouter({
   ]
 })
 
-// 前端路由守卫只负责体验，真正的权限校验在后端
-router.beforeEach((to) => {
-  const tokenExisted = document.cookie.includes('blog_token=')
-  if (to.meta.requiresAuth && !tokenExisted) {
+// 路由守卫：不能用 document.cookie 判断登录态 —— token 是 HttpOnly，JS 读不到。
+// 正确做法是让 store 调 /auth/me 拿用户态（后端返回 401 时视为未登录）。
+router.beforeEach(async (to) => {
+  if (!to.meta.requiresAuth) return true
+
+  const userStore = useUserStore()
+  const user = await userStore.fetchMe()
+  if (!user) {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
   return true
+})
+
+// 每次切换路由先恢复站点默认 SEO，文章页加载后再覆盖
+router.afterEach(() => {
+  resetSeo()
 })
 
 export default router

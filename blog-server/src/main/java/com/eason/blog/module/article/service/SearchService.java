@@ -32,10 +32,13 @@ public class SearchService {
 
     private final ArticleMapper articleMapper;
     private final CategoryMapper categoryMapper;
+    private final ArticleTagResolver tagResolver;
 
-    public SearchService(ArticleMapper articleMapper, CategoryMapper categoryMapper) {
+    public SearchService(ArticleMapper articleMapper, CategoryMapper categoryMapper,
+                         ArticleTagResolver tagResolver) {
         this.articleMapper = articleMapper;
         this.categoryMapper = categoryMapper;
+        this.tagResolver = tagResolver;
     }
 
     public PageResult<ArticleSummaryVO> search(String keyword, int page, int size) {
@@ -55,6 +58,9 @@ public class SearchService {
                 .orderByDesc(Article::getPublishTime));
 
         Map<Long, String> categoryNames = categoryNames(result.getRecords());
+        Map<Long, List<String>> tagNames = tagResolver.byArticleIds(
+                result.getRecords().stream().map(Article::getId).toList());
+
         return PageResult.of(result, article -> new ArticleSummaryVO(
                 article.getId(),
                 article.getTitle(),
@@ -63,7 +69,7 @@ public class SearchService {
                 article.getCover(),
                 article.getCategoryId(),
                 article.getCategoryId() == null ? null : categoryNames.get(article.getCategoryId()),
-                List.of(),
+                tagNames.getOrDefault(article.getId(), List.of()),
                 article.getIsTop() != null && article.getIsTop() == 1,
                 article.getIsRecommend() != null && article.getIsRecommend() == 1,
                 article.getViewCount() == null ? 0 : article.getViewCount(),

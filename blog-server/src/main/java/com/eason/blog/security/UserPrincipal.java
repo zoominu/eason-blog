@@ -22,20 +22,27 @@ public class UserPrincipal implements UserDetails {
     private final String nickname;
     private final boolean enabled;
     private final List<String> roles;
+    private final int tokenVersion;
 
     public UserPrincipal(Long id, String email, String password, String nickname,
-                         boolean enabled, List<String> roles) {
+                         boolean enabled, List<String> roles, int tokenVersion) {
         this.id = id;
         this.email = email;
         this.password = password;
         this.nickname = nickname;
         this.enabled = enabled;
         this.roles = roles == null ? List.of() : List.copyOf(roles);
+        this.tokenVersion = tokenVersion;
     }
 
     public static UserPrincipal of(User user, List<String> roles) {
         return new UserPrincipal(user.getId(), user.getEmail(), user.getPassword(),
-                user.getNickname(), user.getStatus() != null && user.getStatus() == 1, roles);
+                user.getNickname(), user.getStatus() != null && user.getStatus() == 1, roles,
+                user.getTokenVersion() == null ? 0 : user.getTokenVersion());
+    }
+
+    public int getTokenVersion() {
+        return tokenVersion;
     }
 
     public Long getId() {

@@ -83,6 +83,8 @@ public class UserServiceImpl implements UserService {
             throw BusinessException.badRequest("新密码不能与旧密码相同");
         }
         user.setPassword(passwordEncoder.encode(request.newPassword()));
+        // 自增 token 版本：改密后所有旧 Cookie 立即失效，必须重新登录
+        user.setTokenVersion((user.getTokenVersion() == null ? 0 : user.getTokenVersion()) + 1);
         user.setUpdateTime(LocalDateTime.now());
         userMapper.updateById(user);
     }
