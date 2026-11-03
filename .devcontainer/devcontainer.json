@@ -1,0 +1,43 @@
+{
+  "name": "Eason Blog（Codespaces 一键环境）",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "app",
+  "workspaceFolder": "/workspaces/eason-blog",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "22"
+    }
+  },
+  "forwardPorts": [5173, 5174, 8080],
+  "portsAttributes": {
+    "5173": {
+      "label": "前台",
+      "onAutoForward": "openBrowser",
+      "visibility": "public"
+    },
+    "5174": {
+      "label": "后台",
+      "visibility": "public"
+    },
+    "8080": {
+      "label": "后端 API",
+      "visibility": "public"
+    }
+  },
+  "postCreateCommand": "bash .devcontainer/setup.sh",
+  "postStartCommand": "bash .devcontainer/start.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "vscjava.vscode-java-pack",
+        "vmware.vscode-spring-boot",
+        "Vue.volar",
+        "dbaeumer.vscode-eslint"
+      ],
+      "settings": {
+        "java.configuration.updateBuildConfiguration": "automatic"
+      }
+    }
+  },
+  "remoteUser": "vscode"
+}

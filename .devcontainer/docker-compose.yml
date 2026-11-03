@@ -1,0 +1,43 @@
+# Codespaces / Dev Container 编排：应用容器 + MySQL 8
+# 端口 5173（前台）、5174（后台）、8080（API）由 devcontainer.json 转发为可公开访问的 HTTPS 地址。
+services:
+  app:
+    image: mcr.microsoft.com/devcontainers/java:1-21-bookworm
+    command: sleep infinity
+    volumes:
+      - ..:/workspaces/eason-blog:cached
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      DB_NAME: eason_blog
+      DB_USER: blog
+      DB_PASSWORD: blog_dev_pwd
+      # 演示用管理员账号：首次启动创建，仅用于 Codespaces 演示环境
+      BLOG_ADMIN_EMAIL: admin@eason.blog
+      BLOG_ADMIN_PASSWORD: Admin123456
+      BLOG_ADMIN_NICKNAME: Eason
+      SPRING_PROFILES_ACTIVE: dev
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: eason_blog
+      MYSQL_USER: blog
+      MYSQL_PASSWORD: blog_dev_pwd
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - mysql-data:/var/lib/mysql
+
+volumes:
+  mysql-data:

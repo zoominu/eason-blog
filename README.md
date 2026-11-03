@@ -69,6 +69,28 @@ $env:BLOG_ADMIN_PASSWORD="your-strong-password"
 # 然后启动后端；成功后关闭窗口，别把密码写进脚本或仓库
 ```
 
+## 在 GitHub 上运行（Codespaces，可生成公开链接）
+
+> 先说清楚：**GitHub 不是应用托管平台**。Pages 只能放静态文件，跑不了 Spring Boot + MySQL；
+> 想让"别人点开链接就能看"，最容易的方式是用 **Codespaces**（GitHub 提供的云端开发容器）。
+
+1. 仓库页 → **Code** → **Codespaces** → **Create codespace on main**
+2. 首次初始化约 3–5 分钟（装依赖 + 下载 Maven 依赖），完成后会自动拉起后端和两个前端
+3. 打开 **PORTS** 面板 → 找到 `5173` → 右键 **Port Visibility** → **Public**
+4. 复制形如 `https://xxx-5173.app.github.dev` 的地址发给别人即可访问
+5. 后台同理：把 `5174` 也设为 Public，账号 `admin@eason.blog` / `Admin123456`
+
+限制（务必了解）：
+
+| 项 | 说明 |
+| --- | --- |
+| 生命周期 | 停止 / 回收 Codespace 后链接立即失效，不是长期网站 |
+| 免费额度 | 个人账号 120 core-hours/月，2 核机器约等于 60 小时 |
+| 休眠 | 闲置 30 分钟自动停止，下次打开需重新启动 |
+| 用途 | 演示、评审、给别人看一眼；**不要当生产环境** |
+
+要长期网址，请走 `docs/DEPLOYMENT.md` 的 VPS + Nginx 方案，或用 Render / Railway / Zeabur 这类支持 Java 的 PaaS。
+
 ## 从虚拟机 / 局域网访问
 
 开发服务器监听 `0.0.0.0`，但有两件事必须注意：
