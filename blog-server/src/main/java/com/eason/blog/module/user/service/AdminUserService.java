@@ -118,6 +118,33 @@ public class AdminUserService {
         }
     }
 
+    /**
+     * 删除用户：逻辑删除 + 解除角色绑定。
+     *
+     * <p>保护规则：不能删自己；不能删掉最后一个管理员，
+     * 否则站点会进入没人能进后台的死锁状态。</p>
+     */
+    @Transactional
+    public void delete(Long id, Long operatorId) {
+        User user = require(id);
+        if (Objects.equals(id, operatorId)) {
+            throw BusinessException.badRequest("不能删除自己的账号");
+        }
+
+        List<String> roleCodes = userRoleMapper.selectRoleCodesByUserId(id);
+        if (roleCodes.contains("SUPER_ADMIN")) {
+            long admins = userRoleMapper.selectUserIdsByRoleCode("SUPER_ADMIN").size();
+            if (admins <= 1) {
+                throw BusinessException.badRequest("至少保留一个管理员账号");
+            }
+        }
+
+        // 逻辑删除用户（@TableLogic 字段只能通过 deleteById 更新），
+        // 历史评论/文章仍保留，作者显示为已注销
+        userMapper.deleteById(id);
+        userRoleMapper.delete(Wrappers.<UserRole>lambdaQuery().eq(UserRole::getUserId, id));
+    }
+
     public List<RoleVO> roles() {
         return roleMapper.selectList(Wrappers.<Role>lambdaQuery().orderByAsc(Role::getId)).stream()
                 .map(role -> new RoleVO(role.getId(), role.getCode(), role.getName(), role.getDescription(),

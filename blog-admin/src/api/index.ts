@@ -121,7 +121,8 @@ export const userApi = {
     get<PageResult<AdminUser>>('/admin/users', { ...params }),
   disable: (id: number) => post<void>(`/admin/users/${id}/disable`),
   enable: (id: number) => post<void>(`/admin/users/${id}/enable`),
-  assignRoles: (id: number, roleIds: number[]) => patch<void>(`/admin/users/${id}/roles`, { roleIds })
+  assignRoles: (id: number, roleIds: number[]) => patch<void>(`/admin/users/${id}/roles`, { roleIds }),
+  remove: (id: number) => del<void>(`/admin/users/${id}`)
 }
 
 export const roleApi = {

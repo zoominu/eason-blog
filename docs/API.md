@@ -265,6 +265,7 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | POST | `/admin/users/{id}/disable` | 禁用（不能禁用自己） |
 | POST | `/admin/users/{id}/enable` | 启用 |
 | PATCH | `/admin/users/{id}/roles` | `{ "roleIds": [1,2] }`；不能移除自己的管理员角色 |
+| DELETE | `/admin/users/{id}` | 逻辑删除 + 解除角色；不能删自己、不能删最后一个管理员 |
 | GET | `/admin/roles` | 角色 + 权限 id |
 | GET | `/admin/permissions` | 权限点字典 |
 | PATCH | `/admin/roles/{id}/permissions` | `{ "permissionIds": [...] }` |

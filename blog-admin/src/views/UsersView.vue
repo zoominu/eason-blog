@@ -46,6 +46,22 @@ async function toggleStatus(row: AdminUser) {
   }
 }
 
+/** 删除用户：逻辑删除，历史评论/文章保留，作者显示为已注销 */
+async function removeUser(row: AdminUser) {
+  await ElMessageBox.confirm(
+    `确定删除用户「${row.nickname}」？删除后该账号无法登录，历史评论仍保留。`,
+    '删除用户',
+    { type: 'warning', confirmButtonText: '删除', confirmButtonClass: 'el-button--danger' }
+  )
+  try {
+    await userApi.remove(row.id)
+    ElMessage.success('已删除')
+    await load()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  }
+}
+
 async function openRoles(row: AdminUser) {
   editing.value = row
   selectedRoles.value = roles.value
@@ -140,12 +156,13 @@ onMounted(async () => {
         <el-table-column label="IP" width="130">
           <template #default="{ row }"><span class="mono">{{ row.lastLoginIp || '—' }}</span></template>
         </el-table-column>
-        <el-table-column label="操作" width="170" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openRoles(row)">角色</el-button>
             <el-button link :type="row.status === 1 ? 'danger' : 'success'" @click="toggleStatus(row)">
               {{ row.status === 1 ? '禁用' : '启用' }}
             </el-button>
+            <el-button link type="danger" @click="removeUser(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>

@@ -6,7 +6,8 @@ import DOMPurify from 'dompurify'
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
-const mode = ref<'split' | 'edit' | 'preview'>('split')
+// 默认全宽编辑：分栏模式下右侧预览区会占掉一半，写作时显得局促
+const mode = ref<'split' | 'edit' | 'preview'>('edit')
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 
 marked.setOptions({ gfm: true, breaks: false })
@@ -92,6 +93,8 @@ function prefixLine(prefix: string, placeholder: string) {
 
 <style scoped>
 .editor {
+  /* el-form-item__content 是 flex 容器，不显式撑满会按内容宽度收缩 */
+  width: 100%;
   border: 1px solid var(--el-border-color);
   border-radius: 10px;
   overflow: hidden;
@@ -150,7 +153,7 @@ function prefixLine(prefix: string, placeholder: string) {
 
 .body {
   display: grid;
-  min-height: 420px;
+  min-height: 560px;
 }
 
 .body--split {
@@ -164,7 +167,7 @@ function prefixLine(prefix: string, placeholder: string) {
 
 .input {
   width: 100%;
-  min-height: 420px;
+  min-height: 560px;
   padding: 16px;
   border: none;
   outline: none;

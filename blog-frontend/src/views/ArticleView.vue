@@ -31,6 +31,7 @@ import Pagination from '@/components/Pagination.vue'
 import { useUserStore } from '@/stores/user'
 import { formatDate, formatCount } from '@/utils/format'
 import { applyArticleSeo, SITE_NAME } from '@/utils/seo'
+import { showToast } from '@/utils/toast'
 
 hljs.registerLanguage('java', java)
 hljs.registerLanguage('sql', sql)
@@ -331,20 +332,25 @@ async function share() {
   const title = article.value?.title ?? SITE_NAME
   const text = buildShareText(url)
 
-  // 系统分享优先（移动端），桌面端一般不可用
+  // 系统分享优先（移动端）；部分桌面浏览器有该 API 但会挂起，加超时兜底
   if (navigator.share) {
     try {
-      await navigator.share({ title, text, url })
+      await Promise.race([
+        navigator.share({ title, text, url }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('share timeout')), 1500))
+      ])
       return
     } catch {
-      // 用户取消，继续走复制
+      // 用户取消或不支持，继续走复制
     }
   }
   try {
     await copyText(text)
-    commentHint.value = '分享文案已复制，可直接粘贴'
+    commentHint.value = ''
+    showToast('分享文案已复制到剪贴板')
   } catch {
     commentHint.value = text
+    showToast('复制失败，可手动复制下方内容', 'error')
   }
 }
 
@@ -592,8 +598,8 @@ watch(
 }
 
 .article {
-  /* 原来 900px 在大屏上两侧空白过多；正文 + 目录共约 1200px 更平衡 */
-  max-width: 1200px;
+  /* 大屏下正文 + 目录铺开，避免两侧留白过多 */
+  max-width: 1320px;
 }
 
 .back {
@@ -658,8 +664,8 @@ watch(
 
 .body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
-  gap: 64px;
+  grid-template-columns: minmax(0, 1fr) 200px;
+  gap: 96px;
   align-items: start;
 }
 

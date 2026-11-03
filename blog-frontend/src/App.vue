@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
+import ToastHost from '@/components/ToastHost.vue'
 import { useUserStore } from '@/stores/user'
 
 const userStore = useUserStore()
@@ -16,6 +17,7 @@ onMounted(() => {
       <component :is="Component" />
     </Transition>
   </RouterView>
+  <ToastHost />
 </template>
 
 <style>
