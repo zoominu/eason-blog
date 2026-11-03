@@ -117,6 +117,37 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | GET | `/site/config` | 公开配置（仅 `is_public=1`） |
 | GET | `/site/statistics` | 文章数/阅读数/分类数/标签数/专栏数 |
 | GET | `/guestbook` | 已审核留言分页 |
+| POST | `/guestbook` | 提交留言（登录，默认待审核） |
+
+### 3.4 搜索与专栏
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/search?keyword=&page=&size=` | 站内搜索标题/摘要/正文，只搜已发布公开文章 |
+| GET | `/columns/{slug}/articles` | 专栏内文章，按 `blog_column_article.sort` 排序 |
+
+### 3.5 互动
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/articles/{slug}/comments` | 已审核评论（树形，含 `replies`） |
+| POST | `/articles/{id}/comments` | 发表评论/回复（登录，默认待审核） |
+| GET | `/articles/{id}/interaction` | 当前用户点赞/收藏状态 + 计数 |
+| POST/DELETE | `/articles/{id}/like` | 点赞 / 取消（幂等） |
+| POST/DELETE | `/articles/{id}/favorite` | 收藏 / 取消（幂等） |
+| GET | `/users/me/favorites` | 我的收藏（分页） |
+| GET | `/users/me/notifications` | 我的通知 |
+| GET | `/users/me/notifications/unread-count` | 未读数 |
+| PATCH | `/users/me/notifications/{id}/read` | 标记已读 |
+
+评论请求：
+
+```json
+{ "content": "写点什么", "parentId": null }
+```
+
+`parentId` 为空表示顶层评论；回复时传被回复评论的 id。评论创建后 `status=0`（待审核），
+审核通过才出现在公开列表，并同步累加文章的 `comment_count`。
 
 `/site/config` 返回键值对：`site.title`、`site.subtitle`、`site.description`、`site.author`、`site.avatar`、`site.startDate`、`site.github`、`site.icp`。
 

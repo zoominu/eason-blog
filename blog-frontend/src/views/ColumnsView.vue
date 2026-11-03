@@ -1,21 +1,29 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { Layers } from 'lucide-vue-next'
+import { ArrowLeft, BookOpen } from 'lucide-vue-next'
 import { taxonomyApi } from '@/api'
-import type { Column } from '@/api/types'
+import type { ArticleSummary, Column } from '@/api/types'
+import ArticleCard from '@/components/ArticleCard.vue'
 import EmptyState from '@/components/EmptyState.vue'
 
 const route = useRoute()
 const columns = ref<Column[]>([])
 const current = ref<Column | null>(null)
+const articles = ref<ArticleSummary[]>([])
 const loading = ref(true)
 
 onMounted(async () => {
   try {
     const slug = route.params.slug ? String(route.params.slug) : ''
     if (slug) {
-      current.value = await taxonomyApi.column(slug)
+      // 详情与文章列表并行请求
+      const [column, list] = await Promise.all([
+        taxonomyApi.column(slug),
+        taxonomyApi.columnArticles(slug)
+      ])
+      current.value = column
+      articles.value = list
     } else {
       columns.value = await taxonomyApi.columns()
     }
@@ -27,6 +35,10 @@ onMounted(async () => {
 
 <template>
   <div class="container">
+    <RouterLink v-if="current" to="/columns" class="back">
+      <ArrowLeft :size="15" /> 全部专栏
+    </RouterLink>
+
     <header class="head">
       <h1>{{ current ? current.name : '专栏' }}</h1>
       <p class="muted">{{ current?.description || '成体系的学习路径与系列文章' }}</p>
@@ -36,11 +48,18 @@ onMounted(async () => {
       <div v-for="i in 3" :key="i" class="card skeleton" />
     </div>
 
-    <div v-else-if="current" class="card detail">
-      <p class="detail__desc">{{ current.description || '这个专栏还没有简介。' }}</p>
-      <p class="muted">共收录 {{ current.articleCount }} 篇文章</p>
-      <p class="muted hint">专栏文章列表将在 P3 阶段接入（需要 blog_column_article 关联查询）。</p>
-    </div>
+    <template v-else-if="current">
+      <div class="summary card">
+        <BookOpen :size="18" class="summary__icon" />
+        <span>共收录 {{ articles.length }} 篇文章</span>
+        <span class="muted">按专栏顺序阅读效果更好</span>
+      </div>
+
+      <div v-if="articles.length" class="grid">
+        <ArticleCard v-for="article in articles" :key="article.id" :article="article" />
+      </div>
+      <EmptyState v-else title="专栏还没有文章" description="在后台把文章加入专栏后会显示在这里。" />
+    </template>
 
     <div v-else-if="columns.length" class="grid">
       <RouterLink
@@ -49,10 +68,10 @@ onMounted(async () => {
         :to="`/column/${column.slug}`"
         class="card column"
       >
-        <Layers :size="18" class="column__icon" />
+        <BookOpen :size="18" class="column__icon" />
         <span class="column__name">{{ column.name }}</span>
         <p class="column__desc muted">{{ column.description || '暂无简介' }}</p>
-        <span class="muted column__count">{{ column.articleCount }} 篇文章</span>
+        <span class="column__count">{{ column.articleCount }} 篇文章</span>
       </RouterLink>
     </div>
 
@@ -61,8 +80,17 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--fg-soft);
+  margin-bottom: 14px;
+}
+
 .head {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .head h1 {
@@ -71,9 +99,22 @@ onMounted(async () => {
   letter-spacing: -0.02em;
 }
 
+.summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+.summary__icon {
+  color: var(--accent);
+}
+
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 16px;
 }
 
@@ -101,21 +142,8 @@ onMounted(async () => {
 
 .column__count {
   font-size: 12px;
-  margin-top: 8px;
-}
-
-.detail {
-  padding: 28px;
-}
-
-.detail__desc {
-  margin: 0 0 12px;
-  color: var(--fg-soft);
-}
-
-.hint {
-  font-size: 12px;
-  margin-top: 16px;
+  color: var(--accent);
+  margin-top: 6px;
 }
 
 .skeleton {

@@ -85,3 +85,32 @@ export interface SiteStatistics {
 }
 
 export type SiteConfig = Record<string, string>
+
+export interface InteractionState {
+  liked: boolean
+  favorited: boolean
+  likeCount: number
+  commentCount: number
+}
+
+export interface CommentItem {
+  id: number
+  userId: number
+  nickname: string
+  avatar?: string | null
+  content: string
+  parentId: number
+  createTime: string
+  mine: boolean
+  replies: CommentItem[]
+}
+
+export interface NotificationItem {
+  id: number
+  type: string
+  title: string
+  content?: string | null
+  link?: string | null
+  read: boolean
+  createTime: string
+}

@@ -1,9 +1,12 @@
-import { get, patch, post } from './http'
+import { del, get, patch, post } from './http'
 import type {
   ArticleDetail,
   ArticleSummary,
   Category,
   Column,
+  CommentItem,
+  InteractionState,
+  NotificationItem,
   PageResult,
   SiteConfig,
   SiteStatistics,
@@ -34,7 +37,8 @@ export const taxonomyApi = {
   tagArticles: (slug: string, page = 1, size = 10) =>
     get<PageResult<ArticleSummary>>(`/tags/${slug}/articles`, { page, size }),
   columns: () => get<Column[]>('/columns'),
-  column: (slug: string) => get<Column>(`/columns/${slug}`)
+  column: (slug: string) => get<Column>(`/columns/${slug}`),
+  columnArticles: (slug: string) => get<ArticleSummary[]>(`/columns/${slug}/articles`)
 }
 
 export const siteApi = {
@@ -52,4 +56,25 @@ export const authApi = {
     patch<User>('/users/me', payload),
   changePassword: (oldPassword: string, newPassword: string) =>
     patch<void>('/users/me/password', { oldPassword, newPassword })
+}
+
+/** 互动：评论、点赞、收藏、收藏列表、通知、留言 */
+export const interactionApi = {
+  status: (articleId: number) => get<InteractionState>(`/articles/${articleId}/interaction`),
+  like: (articleId: number) => post<InteractionState>(`/articles/${articleId}/like`),
+  unlike: (articleId: number) => del<InteractionState>(`/articles/${articleId}/like`),
+  favorite: (articleId: number) => post<InteractionState>(`/articles/${articleId}/favorite`),
+  unfavorite: (articleId: number) => del<InteractionState>(`/articles/${articleId}/favorite`),
+
+  comments: (slug: string) => get<CommentItem[]>(`/articles/${slug}/comments`),
+  addComment: (articleId: number, content: string, parentId?: number | null) =>
+    post<{ id: number }>(`/articles/${articleId}/comments`, { content, parentId }),
+
+  favorites: (page = 1, size = 10) =>
+    get<PageResult<ArticleSummary>>('/users/me/favorites', { page, size }),
+  notifications: (limit = 20) => get<NotificationItem[]>('/users/me/notifications', { limit }),
+  unreadCount: () => get<{ count: number }>('/users/me/notifications/unread-count'),
+  markRead: (id: number) => patch<void>(`/users/me/notifications/${id}/read`),
+
+  submitGuestbook: (content: string) => post<void>('/guestbook', { content })
 }

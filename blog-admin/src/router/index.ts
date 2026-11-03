@@ -61,14 +61,14 @@ const router = createRouter({
         {
           path: 'comments',
           name: 'comments',
-          component: () => import('@/views/PlaceholderView.vue'),
-          meta: { title: '评论审核', note: '评论审核与回复将在 P4 实现。' }
+          component: () => import('@/views/ModerationView.vue'),
+          meta: { title: '评论审核' }
         },
         {
           path: 'guestbook',
           name: 'guestbook',
-          component: () => import('@/views/PlaceholderView.vue'),
-          meta: { title: '留言管理', note: '留言审核与回复将在 P4 实现。' }
+          component: () => import('@/views/ModerationView.vue'),
+          meta: { title: '留言管理' }
         },
         {
           path: 'users',

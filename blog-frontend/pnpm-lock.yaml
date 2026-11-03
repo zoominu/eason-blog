@@ -14,6 +14,9 @@ importers:
       dompurify:
         specifier: ^3.2.3
         version: 3.4.17
+      highlight.js:
+        specifier: ^11.12.0
+        version: 11.12.0
       lucide-vue-next:
         specifier: ^0.469.0
         version: 0.469.0(vue@3.5.44(typescript@5.7.3))
@@ -713,6 +716,10 @@ packages:
   he@1.2.0:
     resolution: {integrity: sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==}
     hasBin: true
+
+  highlight.js@11.12.0:
+    resolution: {integrity: sha512-nbfWpyRMcMrPMmDwJB+dhX/eiaPKtc2RB+0QZskqJ3WjRA/FDS0e9hZrx8EC/lbEv8gXy98FcDbNa/dspAaJMg==}
+    engines: {node: '>=12.0.0'}
 
   https-proxy-agent@5.0.1:
     resolution: {integrity: sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA==}
@@ -1495,6 +1502,8 @@ snapshots:
       function-bind: 1.1.2
 
   he@1.2.0: {}
+
+  highlight.js@11.12.0: {}
 
   https-proxy-agent@5.0.1:
     dependencies:

@@ -241,3 +241,93 @@ a {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* ------------------------------------------------------------------
+ * 代码高亮（highlight.js token 映射）
+ * 用 CSS 变量自己做两套配色，而不是引入 github.css/github-dark.css：
+ * 主题切换时不需要换样式表，也不会因为 `html.dark` 与 data-theme 不一致而错乱。
+ * ------------------------------------------------------------------ */
+:root {
+  --code-keyword: #cf222e;
+  --code-string: #0a3069;
+  --code-number: #0550ae;
+  --code-comment: #6e7781;
+  --code-function: #8250df;
+  --code-title: #6639ba;
+  --code-attr: #0550ae;
+  --code-builtin: #953800;
+}
+
+html[data-theme='dark'] {
+  --code-keyword: #ff7b72;
+  --code-string: #a5d6ff;
+  --code-number: #79c0ff;
+  --code-comment: #8b949e;
+  --code-function: #d2a8ff;
+  --code-title: #d2a8ff;
+  --code-attr: #79c0ff;
+  --code-builtin: #ffa657;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-doctag {
+  color: var(--code-keyword);
+}
+
+.hljs-string,
+.hljs-regexp,
+.hljs-template-tag,
+.hljs-template-variable {
+  color: var(--code-string);
+}
+
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-variable,
+.hljs-params {
+  color: var(--code-number);
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: var(--code-comment);
+  font-style: italic;
+}
+
+.hljs-title,
+.hljs-title.function_,
+.hljs-section {
+  color: var(--code-function);
+  font-weight: 500;
+}
+
+.hljs-title.class_,
+.hljs-type {
+  color: var(--code-title);
+}
+
+.hljs-attr,
+.hljs-attribute,
+.hljs-property,
+.hljs-selector-attr,
+.hljs-selector-class,
+.hljs-selector-id {
+  color: var(--code-attr);
+}
+
+.hljs-built_in,
+.hljs-meta,
+.hljs-name {
+  color: var(--code-builtin);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: 600;
+}

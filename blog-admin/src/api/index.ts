@@ -64,3 +64,35 @@ export const columnApi = {
     patch<void>(`/admin/columns/${id}`, payload),
   remove: (id: number) => del<void>(`/admin/columns/${id}`)
 }
+
+export interface AdminComment {
+  id: number
+  articleId: number
+  articleTitle: string
+  nickname: string
+  email: string
+  content: string
+  status: number
+  createTime: string
+}
+
+export interface AdminGuestbook {
+  id: number
+  nickname: string
+  email: string
+  content: string
+  status: number
+  createTime: string
+}
+
+export const moderationApi = {
+  comments: (params: { status?: number; page?: number; size?: number }) =>
+    get<PageResult<AdminComment>>('/admin/comments', { ...params }),
+  approveComment: (id: number) => post<void>(`/admin/comments/${id}/approve`),
+  rejectComment: (id: number) => post<void>(`/admin/comments/${id}/reject`),
+
+  guestbook: (params: { status?: number; page?: number; size?: number }) =>
+    get<PageResult<AdminGuestbook>>('/admin/guestbook', { ...params }),
+  approveGuestbook: (id: number) => post<void>(`/admin/guestbook/${id}/approve`),
+  rejectGuestbook: (id: number) => post<void>(`/admin/guestbook/${id}/reject`)
+}

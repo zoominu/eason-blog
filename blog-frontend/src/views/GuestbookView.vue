@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import { MessageSquare } from 'lucide-vue-next'
-import { get } from '@/api/http'
+import { MessageSquare, Send } from 'lucide-vue-next'
+import { get, post } from '@/api/http'
 import { useUserStore } from '@/stores/user'
 import { formatDateTime } from '@/utils/format'
 
@@ -16,8 +16,12 @@ interface GuestbookMessage {
 const messages = ref<GuestbookMessage[]>([])
 const loading = ref(true)
 const userStore = useUserStore()
+const content = ref('')
+const submitting = ref(false)
+const hint = ref('')
 
-onMounted(async () => {
+async function load() {
+  loading.value = true
   try {
     const page = await get<{ records: GuestbookMessage[] }>('/guestbook', { page: 1, size: 20 })
     messages.value = page.records
@@ -26,7 +30,25 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-})
+}
+
+async function submit() {
+  const text = content.value.trim()
+  if (!text) return
+  submitting.value = true
+  hint.value = ''
+  try {
+    await post<void>('/guestbook', { content: text })
+    content.value = ''
+    hint.value = '留言已提交，审核通过后展示'
+  } catch (e) {
+    hint.value = (e as Error).message
+  } finally {
+    submitting.value = false
+  }
+}
+
+onMounted(load)
 </script>
 
 <template>
@@ -36,7 +58,23 @@ onMounted(async () => {
       <p class="muted">欢迎交流，留言审核后展示</p>
     </header>
 
-    <div v-if="!userStore.isLoggedIn" class="card notice">
+    <div v-if="userStore.isLoggedIn" class="card composer">
+      <textarea
+        v-model="content"
+        class="composer__input"
+        rows="3"
+        maxlength="2000"
+        placeholder="说点什么…（审核通过后展示）"
+      />
+      <div class="composer__foot">
+        <span class="muted">{{ hint || `${content.length}/2000` }}</span>
+        <button class="btn btn-primary" :disabled="submitting || !content.trim()" @click="submit">
+          <Send :size="15" /> {{ submitting ? '提交中…' : '发表留言' }}
+        </button>
+      </div>
+    </div>
+
+    <div v-else class="card notice">
       <MessageSquare :size="18" />
       <span>登录后即可留言。</span>
       <RouterLink to="/login" class="btn btn-primary">去登录</RouterLink>
@@ -70,6 +108,36 @@ onMounted(async () => {
   margin: 0 0 4px;
   font-size: 28px;
   letter-spacing: -0.02em;
+}
+
+.composer {
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.composer__input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--fg);
+  padding: 10px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+
+.composer__input:focus {
+  border-color: var(--accent);
+}
+
+.composer__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 12px;
 }
 
 .notice {
@@ -110,6 +178,7 @@ onMounted(async () => {
   margin: 0;
   font-size: 14px;
   color: var(--fg-soft);
+  white-space: pre-wrap;
 }
 
 .item__reply {

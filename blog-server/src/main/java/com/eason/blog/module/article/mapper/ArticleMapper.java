@@ -19,6 +19,14 @@ public interface ArticleMapper extends BaseMapper<Article> {
     @Update("UPDATE blog_article SET view_count = GREATEST(view_count + 1, 0) WHERE id = #{id}")
     int incrementViewCount(@Param("id") Long id);
 
+    /** 点赞数增减：GREATEST 防御负数，避免并发/重复操作把计数打成负值。 */
+    @Update("UPDATE blog_article SET like_count = GREATEST(like_count + #{delta}, 0) WHERE id = #{id}")
+    int updateLikeCount(@Param("id") Long id, @Param("delta") int delta);
+
+    /** 评论数只统计审核通过的评论。 */
+    @Update("UPDATE blog_article SET comment_count = GREATEST(comment_count + #{delta}, 0) WHERE id = #{id}")
+    int updateCommentCount(@Param("id") Long id, @Param("delta") int delta);
+
     @Select("""
             SELECT COUNT(*) FROM blog_article
             WHERE is_deleted = 0 AND status = #{status}

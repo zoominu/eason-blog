@@ -43,4 +43,9 @@ export async function patch<T>(url: string, body?: unknown): Promise<T> {
   return response.data.data
 }
 
+export async function del<T>(url: string): Promise<T> {
+  const response = await instance.delete<ApiResponse<T>>(url)
+  return response.data.data
+}
+
 export default instance
