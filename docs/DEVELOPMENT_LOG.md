@@ -4,6 +4,17 @@
 
 ---
 
+## 2026-11-03 · 仓库托管与 CI
+
+- 代码推送到 GitHub：`git@github.com:zoominu/eason-blog.git`（`main`，首个提交 `bf8f8cd`）。
+- 环境里原本没有 Git，使用便携 MinGit 2.56（`.tools/git`），不污染系统 PATH。
+- SSH 认证用独立密钥 `.tools/ssh/id_ed25519`，通过 `core.sshCommand` 只对当前仓库生效。
+- 新增 `.github/workflows/ci.yml`：MySQL 8.0 service + `mvn test`；Node 22 + pnpm 11 构建前后台。
+- 首次 CI run #1 全绿：后端 14 用例通过，前台/后台构建成功。
+- 新增 `scripts/push-github.ps1`（推送）与 `scripts/poll-ci.mjs`（查询 CI 状态）。
+
+---
+
 ## 2026-11-03 · 体验修正：排版、用户菜单、主题初始化、分类计数
 
 来源：作者实际浏览页面后提出的四个问题。

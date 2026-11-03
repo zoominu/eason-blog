@@ -1,5 +1,7 @@
 # Eason Blog V1.0
 
+[![CI](https://github.com/zoominu/eason-blog/actions/workflows/ci.yml/badge.svg)](https://github.com/zoominu/eason-blog/actions/workflows/ci.yml)
+
 单作者、前后端分离的个人技术博客：前台阅读站 + 独立管理后台 + 模块化单体后端。
 
 > 需求基线：`docs/PROJECT_DESIGN.md`（由设计文档 DOCX 转换并在仓库内维护）。
