@@ -165,9 +165,11 @@ function addCopyButtons() {
         await copyText(code)
         button.textContent = '已复制'
       } catch {
-        button.textContent = '复制失败'
+        // 两种方式都被浏览器拒绝时，选中代码让用户手动 Ctrl+C，而不是只说“失败”
+        selectText(pre.querySelector('code'))
+        button.textContent = '已全选'
       }
-      setTimeout(() => (button.textContent = '复制'), 1500)
+      setTimeout(() => (button.textContent = '复制'), 1800)
     })
     pre.appendChild(button)
   })
@@ -203,6 +205,16 @@ async function copyText(text: string) {
   if (!ok) {
     throw new Error('copy failed')
   }
+}
+
+/** 复制失败时的最后兜底：选中代码块内容 */
+function selectText(node: Element | null) {
+  if (!node) return
+  const range = document.createRange()
+  range.selectNodeContents(node)
+  const selection = window.getSelection()
+  selection?.removeAllRanges()
+  selection?.addRange(range)
 }
 
 /** 正文图片点击放大 */
