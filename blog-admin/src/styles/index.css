@@ -36,6 +36,10 @@ body {
 }
 
 .page__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   margin-bottom: 18px;
 }
 

@@ -5,6 +5,14 @@ export interface ApiResponse<T> {
   timestamp: string
 }
 
+export interface PageResult<T> {
+  records: T[]
+  total: number
+  current: number
+  size: number
+  pages: number
+}
+
 export interface User {
   id: number
   uid: string
@@ -33,4 +41,87 @@ export interface DashboardData {
   tags: number
   recentArticles: RecentArticle[]
   archive: { month: string; total: number }[]
+}
+
+/** 0 草稿 1 已发布 2 已下线 3 回收站 */
+export type ArticleStatus = 0 | 1 | 2 | 3
+
+export interface AdminArticleListItem {
+  id: number
+  title: string
+  slug: string
+  summary?: string | null
+  categoryId?: number | null
+  categoryName?: string | null
+  tags: string[]
+  status: ArticleStatus
+  visibility: number
+  top: boolean
+  recommend: boolean
+  viewCount: number
+  publishTime?: string | null
+  updateTime: string
+}
+
+export interface AdminArticle {
+  id: number
+  title: string
+  slug: string
+  summary?: string | null
+  cover?: string | null
+  categoryId?: number | null
+  tagIds: number[]
+  tagNames: string[]
+  content: string
+  status: ArticleStatus
+  visibility: number
+  top: boolean
+  recommend: boolean
+  seoTitle?: string | null
+  seoDescription?: string | null
+  viewCount: number
+  publishTime?: string | null
+  createTime: string
+  updateTime: string
+}
+
+export interface ArticleUpsertPayload {
+  title: string
+  slug?: string
+  categoryId?: number | null
+  summary?: string
+  cover?: string
+  content: string
+  visibility: number
+  isTop: number
+  isRecommend: number
+  seoTitle?: string
+  seoDescription?: string
+  tagIds: number[]
+  status?: number
+}
+
+export interface Category {
+  id: number
+  parentId: number
+  name: string
+  slug: string
+  description?: string | null
+  articleCount: number
+}
+
+export interface Tag {
+  id: number
+  name: string
+  slug: string
+  articleCount: number
+}
+
+export interface Column {
+  id: number
+  name: string
+  slug: string
+  description?: string | null
+  cover?: string | null
+  articleCount: number
 }

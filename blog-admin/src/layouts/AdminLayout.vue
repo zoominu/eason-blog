@@ -43,6 +43,11 @@ const menu = computed(() => [
 
 const currentTitle = computed(() => String(route.meta.title ?? ''))
 
+// 编辑页 /articles/12/edit 也要高亮「文章」菜单
+const activeMenu = computed(() =>
+  route.path.startsWith('/articles') ? '/articles' : route.path
+)
+
 async function logout() {
   await userStore.logout()
   router.replace('/login')
@@ -58,7 +63,7 @@ async function logout() {
         <span class="brand__badge">Admin</span>
       </div>
 
-      <el-menu :default-active="route.path" router class="menu">
+      <el-menu :default-active="activeMenu" router class="menu">
         <el-menu-item v-for="item in menu" :key="item.path" :index="item.path">
           <el-icon><component :is="item.icon" /></el-icon>
           <span>{{ item.title }}</span>

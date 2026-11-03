@@ -75,4 +75,31 @@ public interface ArticleMapper extends BaseMapper<Article> {
             GROUP BY ca.column_id
             """)
     List<java.util.Map<String, Object>> countPublicArticlesByColumn();
+
+    /** 后台统计用：不限状态（含草稿/下线/回收），只排除逻辑删除。 */
+    @Select("""
+            SELECT category_id AS taxonomy_id, COUNT(*) AS total
+            FROM blog_article
+            WHERE is_deleted = 0 AND category_id IS NOT NULL
+            GROUP BY category_id
+            """)
+    List<java.util.Map<String, Object>> countAllArticlesByCategory();
+
+    @Select("""
+            SELECT at.tag_id AS taxonomy_id, COUNT(*) AS total
+            FROM blog_article_tag at
+            JOIN blog_article a ON a.id = at.article_id
+            WHERE a.is_deleted = 0
+            GROUP BY at.tag_id
+            """)
+    List<java.util.Map<String, Object>> countAllArticlesByTag();
+
+    @Select("""
+            SELECT ca.column_id AS taxonomy_id, COUNT(*) AS total
+            FROM blog_column_article ca
+            JOIN blog_article a ON a.id = ca.article_id
+            WHERE a.is_deleted = 0
+            GROUP BY ca.column_id
+            """)
+    List<java.util.Map<String, Object>> countAllArticlesByColumn();
 }

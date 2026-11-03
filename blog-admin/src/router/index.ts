@@ -25,26 +25,38 @@ const router = createRouter({
         {
           path: 'articles',
           name: 'articles',
-          component: () => import('@/views/PlaceholderView.vue'),
-          meta: { title: '文章管理', note: '文章 CRUD、Markdown 编辑、发布/下线将在 P2 实现。' }
+          component: () => import('@/views/ArticlesView.vue'),
+          meta: { title: '文章管理' }
+        },
+        {
+          path: 'articles/create',
+          name: 'article-create',
+          component: () => import('@/views/ArticleEditView.vue'),
+          meta: { title: '新建文章' }
+        },
+        {
+          path: 'articles/:id/edit',
+          name: 'article-edit',
+          component: () => import('@/views/ArticleEditView.vue'),
+          meta: { title: '编辑文章' }
         },
         {
           path: 'categories',
           name: 'categories',
-          component: () => import('@/views/PlaceholderView.vue'),
-          meta: { title: '分类管理', note: '分类树维护将在 P2 实现。' }
+          component: () => import('@/views/CategoriesView.vue'),
+          meta: { title: '分类管理' }
         },
         {
           path: 'tags',
           name: 'tags',
-          component: () => import('@/views/PlaceholderView.vue'),
-          meta: { title: '标签管理', note: '标签维护将在 P2 实现。' }
+          component: () => import('@/views/TagsView.vue'),
+          meta: { title: '标签管理' }
         },
         {
           path: 'columns',
           name: 'columns',
-          component: () => import('@/views/PlaceholderView.vue'),
-          meta: { title: '专栏管理', note: '专栏与文章排序将在 P2 实现。' }
+          component: () => import('@/views/ColumnsView.vue'),
+          meta: { title: '专栏管理' }
         },
         {
           path: 'comments',

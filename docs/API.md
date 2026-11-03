@@ -126,11 +126,11 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 
 所有 `/api/v1/admin/**` 要求 `SUPER_ADMIN`，未登录 401、非管理员 403。
 
+### 4.1 仪表盘
+
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/admin/dashboard` | 统计卡片、最近更新、归档 |
-
-响应：
 
 ```json
 {
@@ -141,7 +141,58 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 }
 ```
 
-> 文章/分类/标签/评论/用户等管理接口在 P2–P5 阶段按设计文档补齐。
+### 4.2 文章
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/admin/articles` | 分页，参数 `page`、`size`、`keyword`、`status`、`categoryId` |
+| GET | `/admin/articles/{id}` | 详情（含 Markdown 原文、标签 id） |
+| POST | `/admin/articles` | 新建；`status=1` 表示创建即发布 |
+| PATCH | `/admin/articles/{id}` | 整体更新（含标签全量替换） |
+| POST | `/admin/articles/{id}/publish` | 发布（草稿/下线 → 已发布，补写 `publishTime`） |
+| POST | `/admin/articles/{id}/offline` | 下线（仅已发布可调用，否则 400） |
+| POST | `/admin/articles/{id}/restore` | 从回收站恢复为草稿 |
+| DELETE | `/admin/articles/{id}` | 移入回收站（`status=3`，不物理删除） |
+
+创建 / 更新请求：
+
+```json
+{
+  "title": "标题",
+  "slug": "可选，留空则按标题生成",
+  "categoryId": 2,
+  "summary": "摘要",
+  "cover": "封面地址",
+  "content": "# Markdown 正文",
+  "visibility": 0,
+  "isTop": 0,
+  "isRecommend": 1,
+  "seoTitle": "SEO 标题",
+  "seoDescription": "SEO 描述",
+  "tagIds": [1, 2],
+  "status": 0
+}
+```
+
+约定：
+
+- `slug` 只允许小写字母、数字、短横线；冲突时自动追加 `-2`、`-3`；
+- 中文标题无法音译，自动生成 `post-20261103-ab12`，可在后台手动改成英文；
+- `author_id` 取自登录主体，不接受前端传入；
+- 分类/标签不存在返回 400，不会依赖数据库外键报错。
+
+### 4.3 分类 / 标签 / 专栏
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/admin/categories` | 全部分类（含草稿文章计数） |
+| POST | `/admin/categories` | 新建 |
+| PATCH | `/admin/categories/{id}` | 更新 |
+| DELETE | `/admin/categories/{id}` | 删除；有子分类或有文章时 409 |
+| GET/POST/PATCH/DELETE | `/admin/tags` … | 同上；被文章引用时 409 |
+| GET/POST/PATCH/DELETE | `/admin/columns` … | 同上；专栏内有文章时 409 |
+
+> 评论、用户、角色、资源、日志、系统设置等接口在 P4/P5 阶段补齐。
 
 ---
 

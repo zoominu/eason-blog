@@ -137,8 +137,10 @@ powershell -File scripts/build-admin.ps1
 
 - ✅ P0 工程骨架：三端可运行、统一响应/异常、Flyway 迁移、健康检查
 - ✅ P1 认证：注册 / 登录 / 退出 / 当前用户、JWT Cookie、管理员 bootstrap、权限测试
-- 🟡 阅读链路：公开文章/分类/标签/专栏/站点配置/留言只读接口 + 前台页面已可用
-- ⏳ P2–P6 见 `docs/DEVELOPMENT_LOG.md` 的路线图
+- ✅ 阅读链路：公开文章/分类/标签/专栏/站点配置/留言只读接口 + 前台页面
+- ✅ P2 内容基础：文章 CRUD、Markdown 编辑与实时预览、发布/下线/回收/恢复、分类/标签/专栏管理
+- ⏳ P3 前台完善（搜索、SEO、代码高亮、专栏文章排序）
+- ⏳ P4–P6 见 `docs/DEVELOPMENT_LOG.md` 的路线图
 
 ## 文档
 
