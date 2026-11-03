@@ -31,16 +31,54 @@ export interface RecentArticle {
   updateTime: string
 }
 
+export interface RecentUser {
+  id: number
+  nickname: string
+  email: string
+  avatar?: string | null
+  lastLoginTime: string
+  lastLoginIp?: string | null
+  roles: string[]
+}
+
+export interface LoginLogItem {
+  id: number
+  email: string
+  ip?: string | null
+  loginStatus: number
+  message?: string | null
+  createTime: string
+}
+
+export interface SystemInfo {
+  appName: string
+  profile: string
+  javaVersion: string
+  osName: string
+  osArch: string
+  startedAt: string
+  uptimeSeconds: number
+  heapUsedMb: number
+  heapMaxMb: number
+  dbProduct: string
+  dbVersion: string
+  serverTime: string
+}
+
 export interface DashboardData {
   publishedArticles: number
   draftArticles: number
   offlineArticles: number
+  recycledArticles: number
   totalViews: number
   users: number
   categories: number
   tags: number
   recentArticles: RecentArticle[]
   archive: { month: string; total: number }[]
+  recentUsers: RecentUser[]
+  recentLogins: LoginLogItem[]
+  system: SystemInfo
 }
 
 /** 0 草稿 1 已发布 2 已下线 3 回收站 */

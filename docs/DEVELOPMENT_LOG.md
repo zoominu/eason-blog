@@ -4,6 +4,61 @@
 
 ---
 
+## 2026-11-03 · 仪表盘改版：可跳转指标卡 + 登录审计 + 系统信息
+
+### 需求
+
+1. 仪表盘指标可点击跳转到对应模块；
+2. 细分模块：最近登录用户、最近访问 IP、文章数量、系统信息等。
+
+### 后端
+
+- 新增 `LoginLog` 实体与 Mapper，登录成功/失败都写 `blog_login_log`
+  （失败只记邮箱与 IP，绝不记密码；写日志失败不影响登录主流程）。
+- `DashboardVO`：把原来返回 `Map` 改成明确 record，字段变动可被编译器发现。
+- `DashboardService` 聚合四类数据：
+  - 内容统计：已发布/草稿/下线/回收、累计阅读、用户数、分类数、标签数；
+  - 最近动态：最近更新文章、最近登录用户（带角色）、最近登录记录（带结果）；
+  - 归档：按年月分组；
+  - 系统信息：应用名、profile、Java 版本、OS、启动时间、运行时长、堆内存、数据库版本。
+
+### 后台
+
+- 8 个指标卡（4 列 × 2 行），每张卡带「点击跳转」：
+  已发布 → `/articles?status=1`、草稿 → `?status=0`、已下线 → `?status=2`、
+  回收站 → `?status=3`、用户 → `/users`、分类 → `/categories`、标签 → `/tags`。
+- 新增「最近登录用户」「最近登录记录」两张表，以及「系统信息」描述列表；
+  「最近更新」的表格行可直接点进编辑页。
+- `ArticlesView` 支持从 URL 读取 `status` / `categoryId` 并监听变化，仪表盘跳转后筛选立即生效。
+
+### 验证
+
+```
+后端测试     Tests run: 21, Failures: 0, Errors: 0  BUILD SUCCESS
+接口自检     /admin/dashboard 返回完整结构：
+             counts={published:5,draft:0,offline:1,recycled:0,views:12,users:2,cats:5,tags:8}
+             recentUsers=2, recentLogins=3, system={MySQL 8.0.28, Java 21.0.13, Windows 11}
+类型检查     vue-tsc --noEmit  0 errors
+后台构建     ✓ built in 5.75s
+截图         docs/screenshots/admin-dashboard.png、admin-articles-filtered.png
+```
+
+### 决策
+
+- 登录日志在 P5 之前提前落地：仪表盘要展示「最近访问 IP」，没有日志就只能看用户表最后一条，
+  无法体现失败尝试。日志表已存在，写入成本极低。
+- 仪表盘计数采用「全状态」口径，避免管理员看到「分类 0 篇」但实际有草稿的困惑；
+  前台仍只统计公开文章。
+- 指标卡用 `<button>` 而非 `<div>`，保留键盘可访问性。
+
+### 遗留
+
+- 「用户管理」页仍是占位，点进去看不到用户列表（P5）；
+- 登录日志暂无保留周期清理任务（设计文档要求设定保留期）；
+- `recentLogins` 只取 8 条，完整日志页待 P5。
+
+---
+
 ## 2026-11-03 · P2 内容基础：文章 CRUD + 分类/标签/专栏管理
 
 ### 交付内容

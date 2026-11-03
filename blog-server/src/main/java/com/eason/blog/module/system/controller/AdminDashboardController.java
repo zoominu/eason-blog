@@ -2,11 +2,10 @@ package com.eason.blog.module.system.controller;
 
 import com.eason.blog.common.response.ApiResponse;
 import com.eason.blog.module.system.service.DashboardService;
+import com.eason.blog.module.system.vo.DashboardVO;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.util.Map;
 
 /**
  * 管理端仪表盘。整个 /api/v1/admin/** 在 SecurityConfig 中要求 SUPER_ADMIN，
@@ -23,7 +22,7 @@ public class AdminDashboardController {
     }
 
     @GetMapping("/dashboard")
-    public ApiResponse<Map<String, Object>> dashboard() {
+    public ApiResponse<DashboardVO> dashboard() {
         return ApiResponse.success(dashboardService.overview());
     }
 }

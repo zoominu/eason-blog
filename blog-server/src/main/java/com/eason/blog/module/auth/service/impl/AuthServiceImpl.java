@@ -7,6 +7,8 @@ import com.eason.blog.module.auth.dto.LoginRequest;
 import com.eason.blog.module.auth.dto.RegisterRequest;
 import com.eason.blog.module.auth.service.AuthService;
 import com.eason.blog.module.auth.vo.LoginResult;
+import com.eason.blog.module.log.entity.LoginLog;
+import com.eason.blog.module.log.mapper.LoginLogMapper;
 import com.eason.blog.module.user.entity.Role;
 import com.eason.blog.module.user.entity.User;
 import com.eason.blog.module.user.entity.UserRole;
@@ -44,6 +46,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AppProperties properties;
+    private final LoginLogMapper loginLogMapper;
 
     public AuthServiceImpl(AuthenticationManager authenticationManager,
                            UserMapper userMapper,
@@ -52,7 +55,8 @@ public class AuthServiceImpl implements AuthService {
                            UserService userService,
                            PasswordEncoder passwordEncoder,
                            JwtService jwtService,
-                           AppProperties properties) {
+                           AppProperties properties,
+                           LoginLogMapper loginLogMapper) {
         this.authenticationManager = authenticationManager;
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
@@ -61,6 +65,7 @@ public class AuthServiceImpl implements AuthService {
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
         this.properties = properties;
+        this.loginLogMapper = loginLogMapper;
     }
 
     @Override
@@ -71,8 +76,10 @@ public class AuthServiceImpl implements AuthService {
                     new UsernamePasswordAuthenticationToken(request.email().trim(), request.password()));
         } catch (BadCredentialsException ex) {
             // 不区分"邮箱不存在"和"密码错误"，防止账号枚举
+            recordLogin(null, request.email(), clientIp, 0, "密码错误或账号不存在");
             throw new BusinessException(ErrorCode.UNAUTHORIZED, "邮箱或密码错误");
         } catch (DisabledException ex) {
+            recordLogin(null, request.email(), clientIp, 0, "账号已禁用");
             throw new BusinessException(ErrorCode.FORBIDDEN, "账号已被禁用，请联系管理员");
         }
 
@@ -83,11 +90,32 @@ public class AuthServiceImpl implements AuthService {
         user.setLastLoginTime(LocalDateTime.now());
         user.setLastLoginIp(truncateIp(clientIp));
         userMapper.updateById(user);
+        recordLogin(user.getId(), user.getEmail(), clientIp, 1, "登录成功");
 
         String token = jwtService.issue(user.getId(), user.getEmail(), principal.getRoles());
         UserVO vo = new UserVO(user.getId(), user.getUid(), user.getEmail(), user.getNickname(),
                 user.getAvatar(), user.getBio(), principal.getRoles(), user.getRegisterTime());
         return new LoginResult(token, vo);
+    }
+
+    /**
+     * 写登录日志。日志属于审计辅助信息，写入失败不能影响登录本身，
+     * 因此这里吞掉异常只记 warn。
+     */
+    private void recordLogin(Long userId, String email, String ip, int status, String message) {
+        try {
+            LoginLog log = new LoginLog();
+            log.setUserId(userId);
+            log.setEmail(email == null ? null : email.trim().toLowerCase());
+            log.setIp(truncateIp(ip));
+            log.setLoginStatus(status);
+            log.setMessage(message);
+            log.setCreateTime(LocalDateTime.now());
+            loginLogMapper.insert(log);
+        } catch (RuntimeException ex) {
+            org.slf4j.LoggerFactory.getLogger(AuthServiceImpl.class)
+                    .warn("记录登录日志失败: {}", ex.getMessage());
+        }
     }
 
     @Override

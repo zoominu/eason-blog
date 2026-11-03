@@ -130,16 +130,38 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/admin/dashboard` | 统计卡片、最近更新、归档 |
+| GET | `/admin/dashboard` | 内容统计 + 最近文章/用户/登录 + 归档 + 系统信息 |
 
 ```json
 {
-  "publishedArticles": 3, "draftArticles": 0, "offlineArticles": 0,
-  "totalViews": 36, "users": 2, "categories": 5, "tags": 8,
-  "recentArticles": [{ "id": 1, "title": "…", "status": 1, "updateTime": "…" }],
-  "archive": [{ "month": "2026-11", "total": 2 }]
+  "publishedArticles": 5, "draftArticles": 0, "offlineArticles": 1, "recycledArticles": 0,
+  "totalViews": 12, "users": 2, "categories": 5, "tags": 8,
+  "recentArticles": [{ "id": 6, "title": "…", "status": 1, "updateTime": "…" }],
+  "archive": [{ "month": "2026-11", "total": 2 }],
+  "recentUsers": [{
+    "id": 1, "nickname": "Eason", "email": "admin@eason.blog", "avatar": null,
+    "lastLoginTime": "2026-11-03T17:13:00", "lastLoginIp": "127.0.0.1", "roles": ["SUPER_ADMIN"]
+  }],
+  "recentLogins": [{
+    "id": 3, "email": "admin@eason.blog", "ip": "127.0.0.1",
+    "loginStatus": 1, "message": "登录成功", "createTime": "2026-11-03T17:13:00"
+  }],
+  "system": {
+    "appName": "blog-server", "profile": "dev", "javaVersion": "21.0.13",
+    "osName": "Windows 11", "osArch": "amd64",
+    "startedAt": "2026-11-03T17:06:34", "uptimeSeconds": 400,
+    "heapUsedMb": 62, "heapMaxMb": 3894,
+    "dbProduct": "MySQL", "dbVersion": "8.0.28", "serverTime": "2026-11-03T17:13:14"
+  }
 }
 ```
+
+说明：
+
+- `recentUsers` 取有登录记录的用户，按 `lastLoginTime` 倒序；
+- `recentLogins` 来自 `blog_login_log`，**登录成功与失败都会记录**（失败仅记邮箱与 IP，不记录密码）；
+- `system` 只暴露运行时概况，不含连接串、路径、密钥；
+- 所有计数为「全状态」口径（草稿/下线/回收都算），与前台公开统计不同。
 
 ### 4.2 文章
 

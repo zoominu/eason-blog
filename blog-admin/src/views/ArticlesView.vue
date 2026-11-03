@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { onMounted, reactive, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { articleApi, categoryApi } from '@/api'
 import type { AdminArticleListItem, ArticleStatus, Category } from '@/api/types'
 
+const route = useRoute()
 const router = useRouter()
 
 const list = ref<AdminArticleListItem[]>([])
@@ -68,7 +69,17 @@ async function changeStatus(row: AdminArticleListItem, action: 'publish' | 'offl
   }
 }
 
+/** 从仪表盘等入口带过来的筛选条件：/articles?status=1&categoryId=2 */
+function applyRouteQuery() {
+  const status = route.query.status
+  const categoryId = route.query.categoryId
+  query.status = status !== undefined && status !== '' ? Number(status) : undefined
+  query.categoryId = categoryId !== undefined && categoryId !== '' ? Number(categoryId) : undefined
+  query.page = 1
+}
+
 onMounted(async () => {
+  applyRouteQuery()
   load()
   try {
     categories.value = await categoryApi.list()
@@ -76,6 +87,16 @@ onMounted(async () => {
     // 分类筛选是辅助功能，失败不影响列表
   }
 })
+
+// 已在文章页时再从仪表盘点进来，也要跟随 query 变化
+watch(
+  () => route.query,
+  () => {
+    if (route.path !== '/articles') return
+    applyRouteQuery()
+    load()
+  }
+)
 </script>
 
 <template>
