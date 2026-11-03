@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Eason Blog - 记录 Java、Spring Boot、MySQL 与 Vue 的技术笔记" />
+    <title>Eason Blog</title>
+    <script>
+      // 首屏前根据「用户上次选择 / 系统当前状态」决定主题，避免先白后黑的闪烁。
+      // 注意：这段必须内联在 CSS 之前执行，Vue 挂载后再接管。
+      ;(function () {
+        try {
+          var saved = localStorage.getItem('eason-blog-theme')
+          var mode = saved === 'light' || saved === 'dark' ? saved : 'system'
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          var resolved = mode === 'system' ? (prefersDark ? 'dark' : 'light') : mode
+          document.documentElement.setAttribute('data-theme', resolved)
+          document.documentElement.setAttribute('data-theme-mode', mode)
+        } catch (e) {
+          /* localStorage 不可用时保持默认浅色 */
+        }
+      })()
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

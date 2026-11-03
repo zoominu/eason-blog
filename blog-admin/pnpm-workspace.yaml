@@ -1,0 +1,13 @@
+# pnpm 11 起，构建脚本白名单等设置从 package.json 的 pnpm 字段迁到这里。
+packages: []
+
+onlyBuiltDependencies:
+  - esbuild
+  - vue-demi
+
+dangerouslyAllowAllBuilds: true
+
+verifyDepsBeforeRun: false
+
+# 与 blog-frontend 保持一致：扁平 node_modules，避免符号链接解析问题
+nodeLinker: hoisted

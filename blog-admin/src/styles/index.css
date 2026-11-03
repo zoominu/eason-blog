@@ -1,0 +1,91 @@
+:root {
+  --admin-bg: #f5f6f8;
+  --admin-card: #ffffff;
+  --admin-border: rgba(15, 15, 20, 0.08);
+  --admin-text: #1a1a1f;
+  --admin-muted: #6b7280;
+}
+
+html.dark {
+  --admin-bg: #0b0b0d;
+  --admin-card: #141418;
+  --admin-border: rgba(255, 255, 255, 0.1);
+  --admin-text: #f4f4f5;
+  --admin-muted: #9ca3af;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.page {
+  padding: 20px 24px 32px;
+}
+
+.page__head {
+  margin-bottom: 18px;
+}
+
+.page__title {
+  margin: 0;
+  font-size: 22px;
+  letter-spacing: -0.01em;
+}
+
+.page__desc {
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: var(--admin-muted);
+}
+
+.grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+}
+
+.stat-card {
+  background: var(--admin-card);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.stat-card__label {
+  font-size: 12px;
+  color: var(--admin-muted);
+}
+
+.stat-card__value {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-top: 4px;
+}
+
+/* Element Plus 深色下的背景对齐 */
+html.dark .el-card,
+html.dark .el-table,
+html.dark .el-table tr,
+html.dark .el-table th.el-table__cell {
+  background-color: var(--admin-card);
+}
+
+html.dark .el-table {
+  --el-table-border-color: var(--admin-border);
+  --el-table-text-color: var(--admin-text);
+  --el-table-header-text-color: var(--admin-muted);
+}

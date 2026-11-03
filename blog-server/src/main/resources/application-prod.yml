@@ -1,0 +1,25 @@
+spring:
+  flyway:
+    # 生产只跑结构迁移，绝不加载演示数据
+    locations: classpath:db/migration
+  datasource:
+    hikari:
+      maximum-pool-size: 20
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
+app:
+  jwt:
+    cookie-secure: true
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:https://www.eas0n.top,https://admin.eas0n.top}
+
+logging:
+  level:
+    root: WARN
+    com.eason.blog: INFO
+
+server:
+  forward-headers-strategy: framework

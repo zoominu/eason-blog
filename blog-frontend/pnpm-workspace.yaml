@@ -1,0 +1,16 @@
+# pnpm 11 起，构建脚本白名单等设置从 package.json 的 pnpm 字段迁到这里。
+packages: []
+
+onlyBuiltDependencies:
+  - esbuild
+  - vue-demi
+
+# 开发容器/CI 中允许依赖执行安装脚本（仅本项目依赖，风险可控）
+dangerouslyAllowAllBuilds: true
+
+# 运行脚本前不要自动检测并重装依赖
+verifyDepsBeforeRun: false
+
+# 使用扁平（npm 风格）node_modules：本机跨盘符无法硬链接，且沙箱环境下
+# 符号链接/junction 容易导致 Node 解析失败，hoisted 最稳。
+nodeLinker: hoisted

@@ -1,0 +1,47 @@
+# 可选的 Docker 部署：只容器化 MySQL 与后端，前端静态资源交给宿主机 Nginx。
+# 生产密钥请通过 .env 文件或编排平台的 secret 注入，不要写进本文件。
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: eason-blog-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set in .env}
+      MYSQL_DATABASE: ${DB_NAME:-eason_blog}
+      MYSQL_USER: ${DB_USER:-blog}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?set in .env}
+      TZ: Asia/Shanghai
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ../../blog-server
+    container_name: eason-blog-server
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-eason_blog}
+      DB_USER: ${DB_USER:-blog}
+      DB_PASSWORD: ${DB_PASSWORD:?set in .env}
+      JWT_SECRET: ${JWT_SECRET:?set in .env}
+      BLOG_ADMIN_EMAIL: ${BLOG_ADMIN_EMAIL:-}
+      BLOG_ADMIN_PASSWORD: ${BLOG_ADMIN_PASSWORD:-}
+    ports:
+      - "127.0.0.1:8080:8080"
+
+volumes:
+  mysql-data:

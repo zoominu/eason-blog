@@ -1,0 +1,151 @@
+package com.eason.blog.module.auth.service.impl;
+
+import com.eason.blog.common.exception.BusinessException;
+import com.eason.blog.common.exception.ErrorCode;
+import com.eason.blog.config.AppProperties;
+import com.eason.blog.module.auth.dto.LoginRequest;
+import com.eason.blog.module.auth.dto.RegisterRequest;
+import com.eason.blog.module.auth.service.AuthService;
+import com.eason.blog.module.auth.vo.LoginResult;
+import com.eason.blog.module.user.entity.Role;
+import com.eason.blog.module.user.entity.User;
+import com.eason.blog.module.user.entity.UserRole;
+import com.eason.blog.module.user.mapper.RoleMapper;
+import com.eason.blog.module.user.mapper.UserMapper;
+import com.eason.blog.module.user.mapper.UserRoleMapper;
+import com.eason.blog.module.user.service.UserService;
+import com.eason.blog.module.user.vo.UserVO;
+import com.eason.blog.security.JwtService;
+import com.eason.blog.security.UserPrincipal;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+@Service
+public class AuthServiceImpl implements AuthService {
+
+    private static final String DEFAULT_ROLE = "USER";
+
+    private final AuthenticationManager authenticationManager;
+    private final UserMapper userMapper;
+    private final RoleMapper roleMapper;
+    private final UserRoleMapper userRoleMapper;
+    private final UserService userService;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final AppProperties properties;
+
+    public AuthServiceImpl(AuthenticationManager authenticationManager,
+                           UserMapper userMapper,
+                           RoleMapper roleMapper,
+                           UserRoleMapper userRoleMapper,
+                           UserService userService,
+                           PasswordEncoder passwordEncoder,
+                           JwtService jwtService,
+                           AppProperties properties) {
+        this.authenticationManager = authenticationManager;
+        this.userMapper = userMapper;
+        this.roleMapper = roleMapper;
+        this.userRoleMapper = userRoleMapper;
+        this.userService = userService;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+        this.properties = properties;
+    }
+
+    @Override
+    public LoginResult login(LoginRequest request, String clientIp) {
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.email().trim(), request.password()));
+        } catch (BadCredentialsException ex) {
+            // 不区分"邮箱不存在"和"密码错误"，防止账号枚举
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "邮箱或密码错误");
+        } catch (DisabledException ex) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "账号已被禁用，请联系管理员");
+        }
+
+        UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
+        User user = userService.getById(principal.getId());
+
+        // 记录登录信息：失败不影响登录流程，因此单独更新并忽略并发问题
+        user.setLastLoginTime(LocalDateTime.now());
+        user.setLastLoginIp(truncateIp(clientIp));
+        userMapper.updateById(user);
+
+        String token = jwtService.issue(user.getId(), user.getEmail(), principal.getRoles());
+        UserVO vo = new UserVO(user.getId(), user.getUid(), user.getEmail(), user.getNickname(),
+                user.getAvatar(), user.getBio(), principal.getRoles(), user.getRegisterTime());
+        return new LoginResult(token, vo);
+    }
+
+    @Override
+    @Transactional
+    public UserVO register(RegisterRequest request) {
+        if (!properties.register().enabled()) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "站点已关闭注册");
+        }
+        String email = request.email().trim().toLowerCase();
+        if (userService.getByEmail(email) != null) {
+            throw BusinessException.conflict("该邮箱已注册");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        User user = new User();
+        user.setUid("u" + UUID.randomUUID().toString().replace("-", "").substring(0, 12));
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setNickname(StringUtils.hasText(request.nickname())
+                ? request.nickname().trim()
+                : email.substring(0, email.indexOf('@')));
+        user.setStatus(1);
+        user.setEmailVerified(0);
+        user.setRegisterTime(now);
+        user.setCreateTime(now);
+        user.setUpdateTime(now);
+        user.setIsDeleted(0);
+
+        try {
+            userMapper.insert(user);
+        } catch (DuplicateKeyException ex) {
+            // 并发注册同一邮箱时由唯一索引兜底
+            throw BusinessException.conflict("该邮箱已注册");
+        }
+
+        Role role = roleMapper.selectByCode(DEFAULT_ROLE);
+        if (role == null) {
+            // 种子数据缺失属于部署错误，必须显式失败而不是注册出无角色用户
+            throw new IllegalStateException("缺少默认角色 USER，请检查 Flyway 种子迁移");
+        }
+        UserRole userRole = new UserRole();
+        userRole.setUserId(user.getId());
+        userRole.setRoleId(role.getId());
+        userRole.setCreateTime(now);
+        userRoleMapper.insert(userRole);
+
+        return userService.getProfile(user.getId());
+    }
+
+    @Override
+    public UserVO currentUser(Long userId) {
+        return userService.getProfile(userId);
+    }
+
+    private String truncateIp(String ip) {
+        if (ip == null) {
+            return null;
+        }
+        return ip.length() > 45 ? ip.substring(0, 45) : ip;
+    }
+}

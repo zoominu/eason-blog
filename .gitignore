@@ -1,0 +1,37 @@
+# ---- 构建产物 ----
+target/
+dist/
+*.class
+*.jar
+!.mvn/wrapper/maven-wrapper.jar
+
+# ---- 依赖 ----
+node_modules/
+.pnpm-store/
+
+# ---- 本地工具链（JDK/Maven/MySQL 便携版，体积大，不入库）----
+.tools/
+.tools/m2/
+
+# ---- 运行时数据 ----
+data/
+logs/
+*.log
+blog-server/data/
+
+# ---- 环境变量与密钥 ----
+.env
+.env.local
+*.pem
+*.key
+
+# ---- IDE ----
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# ---- 临时文件 ----
+*.tmp
+*.bak

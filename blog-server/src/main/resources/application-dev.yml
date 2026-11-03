@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:eason_blog}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: ${DB_USER:blog}
+    password: ${DB_PASSWORD:blog_dev_pwd}
+  flyway:
+    # 开发环境额外挂载演示数据目录；生产环境不会加载
+    locations: classpath:db/migration,classpath:db/dev
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-change-me-please-32bytes-minimum-secret}
+  cors:
+    allowed-origins: http://localhost:5173,http://localhost:5174
+  demo-data:
+    enabled: true
+
+logging:
+  level:
+    com.eason.blog: DEBUG
