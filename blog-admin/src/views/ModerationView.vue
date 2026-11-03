@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { moderationApi, type AdminComment, type AdminGuestbook } from '@/api'
@@ -13,6 +13,8 @@ const kind = computed<'comments' | 'guestbook'>(() =>
 const list = ref<(AdminComment | AdminGuestbook)[]>([])
 const total = ref(0)
 const loading = ref(false)
+const selected = ref<(AdminComment | AdminGuestbook)[]>([])
+const highlightId = ref<number | null>(null)
 
 const query = reactive({
   page: 1,
@@ -29,17 +31,42 @@ const STATUS_META: Record<number, { text: string; type: 'info' | 'success' | 'da
 async function load() {
   loading.value = true
   try {
+    // 从通知跳转：?highlight=ID。该评论可能已通过审核，
+    // 所以要把状态筛选清掉、放大页容量，才可能出现在当前结果里。
+    const target = Number(route.query.highlight ?? 0)
+    if (target && query.status === 0) {
+      query.status = undefined
+      query.page = 1
+      query.size = 100
+    }
     const page =
       kind.value === 'guestbook'
         ? await moderationApi.guestbook({ ...query })
         : await moderationApi.comments({ ...query })
     list.value = page.records
     total.value = page.total
+
+    if (target) {
+      highlightId.value = target
+      await nextTick()
+      const row = document.querySelector('.el-table__row--highlight')
+      row?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      setTimeout(() => (highlightId.value = null), 4000)
+    }
   } catch (e) {
     ElMessage.error((e as Error).message)
   } finally {
     loading.value = false
   }
+}
+
+function rowClassName({ row }: { row: AdminComment | AdminGuestbook }) {
+  return highlightId.value === row.id ? 'el-table__row--highlight' : ''
+}
+
+/** 给行加 data-comment-id，方便按 id 滚动定位 */
+function rowProps({ row }: { row: AdminComment | AdminGuestbook }) {
+  return { 'data-comment-id': String(row.id) }
 }
 
 async function moderate(row: AdminComment | AdminGuestbook, approve: boolean) {
@@ -58,9 +85,34 @@ async function moderate(row: AdminComment | AdminGuestbook, approve: boolean) {
   }
 }
 
+function onSelectionChange(rows: (AdminComment | AdminGuestbook)[]) {
+  selected.value = rows
+}
+
+async function batchModerate(approve: boolean) {
+  if (!selected.value.length) return
+  const label = approve ? '通过' : '拒绝'
+  await ElMessageBox.confirm(
+    `确定批量${label}选中的 ${selected.value.length} 条${kind.value === 'guestbook' ? '留言' : '评论'}？`,
+    '批量操作'
+  )
+  try {
+    const ids = selected.value.map((row) => row.id)
+    const result = kind.value === 'guestbook'
+      ? await moderationApi.batchGuestbook(ids, approve)
+      : await moderationApi.batchComments(ids, approve)
+    ElMessage.success(`已${label} ${result.updated} 条`)
+    selected.value = []
+    await load()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  }
+}
+
 onMounted(load)
 watch(() => route.path, () => {
   query.page = 1
+  highlightId.value = null
   load()
 })
 
@@ -108,9 +160,24 @@ async function submitReply() {
           <el-option label="已拒绝" :value="2" />
         </el-select>
         <el-button @click="load">刷新</el-button>
+        <el-button type="success" plain :disabled="!selected.length" @click="batchModerate(true)">
+          批量通过{{ selected.length ? ` (${selected.length})` : '' }}
+        </el-button>
+        <el-button type="danger" plain :disabled="!selected.length" @click="batchModerate(false)">
+          批量拒绝{{ selected.length ? ` (${selected.length})` : '' }}
+        </el-button>
       </div>
 
-      <el-table v-loading="loading" :data="list" row-key="id" size="default">
+      <el-table
+        v-loading="loading"
+        :data="list"
+        row-key="id"
+        size="default"
+        :row-class-name="rowClassName"
+        :row-props="rowProps"
+        @selection-change="onSelectionChange"
+      >
+        <el-table-column type="selection" width="44" />
         <el-table-column v-if="kind === 'comments'" prop="articleTitle" label="文章" min-width="200" show-overflow-tooltip />
         <el-table-column label="用户" width="150">
           <template #default="{ row }">
@@ -154,9 +221,11 @@ async function submitReply() {
         <el-pagination
           v-model:current-page="query.page"
           v-model:page-size="query.size"
-          layout="total, prev, pager, next"
+          layout="total, sizes, prev, pager, next"
+          :page-sizes="[10, 20, 50, 100]"
           :total="total"
           @current-change="load"
+          @size-change="() => { query.page = 1; load() }"
         />
       </div>
     </el-card>
@@ -206,5 +275,19 @@ async function submitReply() {
   border-radius: 10px;
   background: var(--el-fill-color-light);
   font-size: 13px;
+}
+
+:deep(.el-table__row--highlight) {
+  animation: row-flash 3.5s ease;
+}
+
+@keyframes row-flash {
+  0%,
+  60% {
+    background: color-mix(in srgb, var(--el-color-primary) 16%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
 }
 </style>

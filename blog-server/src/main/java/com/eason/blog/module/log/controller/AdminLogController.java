@@ -30,7 +30,7 @@ public class AdminLogController {
             @RequestParam(required = false) @Min(0) @Max(1) Integer status,
             @RequestParam(required = false) @Size(max = 100) String keyword,
             @RequestParam(defaultValue = "1") @Min(1) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return ApiResponse.success(logQueryService.loginLogs(status, keyword, page, size));
     }
 
@@ -38,7 +38,7 @@ public class AdminLogController {
     public ApiResponse<PageResult<AdminOperationLogVO>> operationLogs(
             @RequestParam(required = false) @Size(max = 50) String module,
             @RequestParam(defaultValue = "1") @Min(1) int page,
-            @RequestParam(defaultValue = "20") @Min(1) @Max(50) int size) {
+            @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size) {
         return ApiResponse.success(logQueryService.operationLogs(module, page, size));
     }
 }

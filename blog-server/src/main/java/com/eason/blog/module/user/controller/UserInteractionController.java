@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -57,5 +58,17 @@ public class UserInteractionController {
                                       @PathVariable Long id) {
         interactionService.markRead(principal.getId(), id);
         return ApiResponse.success();
+    }
+
+    /** 一键已读 */
+    @PatchMapping("/notifications/read-all")
+    public ApiResponse<Map<String, Integer>> markAllRead(@AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(Map.of("updated", interactionService.markAllRead(principal.getId())));
+    }
+
+    /** 删除已读通知 */
+    @DeleteMapping("/notifications/read")
+    public ApiResponse<Map<String, Integer>> deleteRead(@AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(Map.of("deleted", interactionService.deleteRead(principal.getId())));
     }
 }

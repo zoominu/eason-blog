@@ -118,10 +118,10 @@ class InteractionApiTest {
 
     @Test
     void commentPaginationReturnsTopLevelWithReplies() throws Exception {
-        // 两条顶层评论 + 一条回复
+        // 两条顶层评论 + 一条（博主）回复
         long first = createComment(null);
         long second = createComment(null);
-        long reply = createComment(first);
+        long reply = createAdminReply(first);
         mockMvc.perform(post("/api/v1/admin/comments/" + first + "/approve").cookie(adminCookie));
         mockMvc.perform(post("/api/v1/admin/comments/" + second + "/approve").cookie(adminCookie));
         mockMvc.perform(post("/api/v1/admin/comments/" + reply + "/approve").cookie(adminCookie));
@@ -243,7 +243,77 @@ class InteractionApiTest {
         mockMvc.perform(get("/api/v1/users/me/notifications").cookie(adminCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data[0].type").value("COMMENT"))
-                .andExpect(jsonPath("$.data[0].read").value(false));
+                .andExpect(jsonPath("$.data[0].read").value(false))
+                // 通知要能定位到具体评论：后台列表带 highlight
+                .andExpect(jsonPath("$.data[0].link").value(org.hamcrest.Matchers.containsString(
+                        "/admin/comments?highlight=")))
+                .andExpect(jsonPath("$.data[0].content").value(org.hamcrest.Matchers.containsString("「")));
+    }
+
+    @Test
+    void cannotReplyToOwnComment() throws Exception {
+        long myComment = createComment(null);
+        mockMvc.perform(post("/api/v1/articles/" + articleId + "/comments")
+                        .cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"自己回自己\",\"parentId\":" + myComment + "}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void authorFlagAndApprovalNotificationLink() throws Exception {
+        // 管理员评论，应带 author=true
+        String body = mockMvc.perform(post("/api/v1/articles/" + articleId + "/comments")
+                        .cookie(adminCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"博主评论\"}"))
+                .andReturn().getResponse().getContentAsString();
+        long adminCommentId = objectMapper.readTree(body).path("data").path("id").asLong();
+        mockMvc.perform(post("/api/v1/admin/comments/" + adminCommentId + "/approve").cookie(adminCookie))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/articles/" + slug + "/comments?size=50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[?(@.content == '博主评论')].author").value(true));
+
+        // 用户评论通过后，通知里必须带 ?comment= 定位参数
+        long userComment = createComment(null);
+        mockMvc.perform(post("/api/v1/admin/comments/" + userComment + "/approve").cookie(adminCookie))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/users/me/notifications?limit=50").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].link").value(org.hamcrest.Matchers.containsString(
+                        "?comment=" + userComment)));
+    }
+
+    @Test
+    void batchModerateComments() throws Exception {
+        long first = createComment(null);
+        long second = createComment(null);
+
+        mockMvc.perform(post("/api/v1/admin/comments/batch").cookie(adminCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"ids\":[" + first + "," + second + "],\"approve\":true}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.updated").value(2));
+
+        mockMvc.perform(get("/api/v1/articles/" + slug + "/comments?size=50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)));
+    }
+
+    @Test
+    void notificationsReadAllAndDeleteRead() throws Exception {
+        createComment(null);
+        mockMvc.perform(patch("/api/v1/users/me/notifications/read-all").cookie(adminCookie))
+                .andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/users/me/notifications/unread-count").cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.count").value(0));
+
+        mockMvc.perform(delete("/api/v1/users/me/notifications/read").cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deleted").value(org.hamcrest.Matchers.greaterThanOrEqualTo(1)));
     }
 
     @Test
@@ -267,6 +337,18 @@ class InteractionApiTest {
         long id = json.path("data").path("id").asLong();
         assertThat(id).isPositive();
         return id;
+    }
+
+    /** 用管理员身份回复：用户不能回复自己的评论，测试回复需要换个身份 */
+    private long createAdminReply(Long parentId) throws Exception {
+        String payload = "{\"content\":\"博主回复\",\"parentId\":%s}".formatted(parentId);
+        String body = mockMvc.perform(post("/api/v1/articles/" + articleId + "/comments")
+                        .cookie(adminCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(payload))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readTree(body).path("data").path("id").asLong();
     }
 
     private Cookie login(String email) throws Exception {

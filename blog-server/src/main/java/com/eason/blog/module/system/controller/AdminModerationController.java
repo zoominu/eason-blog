@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -40,7 +41,7 @@ public class AdminModerationController {
     public ApiResponse<PageResult<AdminCommentVO>> comments(
             @RequestParam(required = false) @Min(0) @Max(2) Integer status,
             @RequestParam(defaultValue = "1") @Min(1) int page,
-            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size) {
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
         return ApiResponse.success(interactionService.adminComments(status, page, size));
     }
 
@@ -56,11 +57,20 @@ public class AdminModerationController {
         return ApiResponse.success();
     }
 
+    /** 批量审核评论：body { "ids": [1,2,3] } */
+    @PostMapping("/comments/batch")
+    @Audit(module = "comment", action = "批量审核评论")
+    public ApiResponse<Map<String, Integer>> batchComments(@RequestBody Map<String, Object> body) {
+        List<Long> ids = idsOf(body);
+        boolean approve = Boolean.TRUE.equals(body.get("approve"));
+        return ApiResponse.success(Map.of("updated", interactionService.batchModerateComments(ids, approve)));
+    }
+
     @GetMapping("/guestbook")
     public ApiResponse<PageResult<AdminGuestbookVO>> guestbook(
             @RequestParam(required = false) @Min(0) @Max(2) Integer status,
             @RequestParam(defaultValue = "1") @Min(1) int page,
-            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size) {
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
         return ApiResponse.success(interactionService.adminGuestbook(status, page, size));
     }
 
@@ -74,6 +84,26 @@ public class AdminModerationController {
     public ApiResponse<Void> rejectGuestbook(@PathVariable Long id) {
         interactionService.moderateGuestbook(id, false);
         return ApiResponse.success();
+    }
+
+    /** 批量审核留言：body { "ids": [1,2,3] } */
+    @PostMapping("/guestbook/batch")
+    @Audit(module = "guestbook", action = "批量审核留言")
+    public ApiResponse<Map<String, Integer>> batchGuestbook(@RequestBody Map<String, Object> body) {
+        List<Long> ids = idsOf(body);
+        boolean approve = Boolean.TRUE.equals(body.get("approve"));
+        return ApiResponse.success(Map.of("updated", interactionService.batchModerateGuestbook(ids, approve)));
+    }
+
+    private List<Long> idsOf(Map<String, Object> body) {
+        Object raw = body.get("ids");
+        if (!(raw instanceof List<?> list)) {
+            return List.of();
+        }
+        return list.stream()
+                .filter(Number.class::isInstance)
+                .map(item -> ((Number) item).longValue())
+                .toList();
     }
 
     /** 博主回复留言：回复即审核通过并通知留言者 */

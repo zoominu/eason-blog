@@ -47,7 +47,7 @@ public class AdminArticleController {
     @GetMapping
     public ApiResponse<PageResult<AdminArticleListItemVO>> page(
             @RequestParam(defaultValue = "1") @Min(1) int page,
-            @RequestParam(defaultValue = "10") @Min(1) @Max(50) int size,
+            @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size,
             @RequestParam(required = false) @Size(max = 100) String keyword,
             @RequestParam(required = false) @Min(0) @Max(3) Integer status,
             @RequestParam(required = false) Long categoryId) {

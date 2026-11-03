@@ -41,7 +41,7 @@ public class AdminResourceController {
     public ApiResponse<PageResult<ResourceVO>> list(
             @RequestParam(required = false) @Size(max = 100) String keyword,
             @RequestParam(defaultValue = "1") @Min(1) int page,
-            @RequestParam(defaultValue = "12") @Min(1) @Max(50) int size) {
+            @RequestParam(defaultValue = "12") @Min(1) @Max(100) int size) {
         return ApiResponse.success(resourceService.page(keyword, page, size));
     }
 

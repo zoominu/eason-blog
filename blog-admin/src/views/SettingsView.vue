@@ -9,6 +9,51 @@ const draft = ref<Record<string, string>>({})
 const loading = ref(true)
 const saving = ref(false)
 
+/**
+ * 固定取值项用下拉，避免手输 true/false/local 拼错。
+ * key 命中即用 options；没命中的仍然是普通输入框。
+ */
+const SELECT_OPTIONS: Record<string, { label: string; value: string }[]> = {
+  'comment.audit': [
+    { label: '需要审核后展示', value: 'true' },
+    { label: '直接展示', value: 'false' }
+  ],
+  'guestbook.audit': [
+    { label: '需要审核后展示', value: 'true' },
+    { label: '直接展示', value: 'false' }
+  ],
+  'register.enabled': [
+    { label: '开放注册', value: 'true' },
+    { label: '关闭注册', value: 'false' }
+  ],
+  'storage.driver': [
+    { label: '本地磁盘', value: 'local' },
+    { label: '对象存储（未实现）', value: 'oss' }
+  ],
+  'site.theme': [
+    { label: '跟随系统', value: 'system' },
+    { label: '浅色', value: 'light' },
+    { label: '深色', value: 'dark' }
+  ]
+}
+
+/** 以 .enabled / .audit 结尾的布尔配置也走下拉 */
+function optionsFor(key: string) {
+  if (SELECT_OPTIONS[key]) return SELECT_OPTIONS[key]
+  if (key.endsWith('.enabled') || key.endsWith('.audit')) {
+    return [
+      { label: '是', value: 'true' },
+      { label: '否', value: 'false' }
+    ]
+  }
+  return null
+}
+
+/** 分享模板这类多行文案用 textarea */
+function isMultiline(item: SystemConfigItem) {
+  return item.key === 'share.template' || (item.description ?? '').includes('模板')
+}
+
 const groups = computed(() => {
   const map = new Map<string, SystemConfigItem[]>()
   for (const item of items.value) {
@@ -22,6 +67,7 @@ const groups = computed(() => {
     guestbook: '留言',
     register: '注册',
     storage: '存储',
+    share: '分享',
     其他: '其他'
   }
   return [...map.entries()].map(([prefix, list]) => ({
@@ -92,11 +138,32 @@ onMounted(load)
       <template #header><span class="panel__title">{{ group.label }}</span></template>
       <el-form label-position="top">
         <el-form-item v-for="item in group.list" :key="item.key" :label="item.description || item.key">
-          <el-input v-model="draft[item.key]" :placeholder="item.key" />
+          <el-select
+            v-if="optionsFor(item.key)"
+            v-model="draft[item.key]"
+            style="width: 100%"
+            placeholder="请选择"
+          >
+            <el-option
+              v-for="option in optionsFor(item.key) ?? []"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
+          </el-select>
+          <el-input
+            v-else-if="isMultiline(item)"
+            v-model="draft[item.key]"
+            type="textarea"
+            :rows="3"
+            :placeholder="item.key"
+          />
+          <el-input v-else v-model="draft[item.key]" :placeholder="item.key" />
           <p class="hint">
             <span class="mono">{{ item.key }}</span>
             <el-tag v-if="item.isPublic === 1" size="small" type="success" class="tag">公开</el-tag>
             <el-tag v-else size="small" type="info" class="tag">仅后台</el-tag>
+            <span v-if="item.key === 'share.template'" class="tag">支持 {title} {url} {summary}</span>
           </p>
         </el-form-item>
       </el-form>

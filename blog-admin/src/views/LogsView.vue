@@ -105,9 +105,11 @@ onMounted(loadLogin)
             <el-pagination
               v-model:current-page="loginQuery.page"
               v-model:page-size="loginQuery.size"
-              layout="total, prev, pager, next"
+              layout="total, sizes, prev, pager, next"
+              :page-sizes="[10, 20, 50, 100]"
               :total="loginTotal"
               @current-change="loadLogin"
+              @size-change="() => { loginQuery.page = 1; loadLogin() }"
             />
           </div>
         </el-tab-pane>
@@ -142,9 +144,11 @@ onMounted(loadLogin)
             <el-pagination
               v-model:current-page="operationQuery.page"
               v-model:page-size="operationQuery.size"
-              layout="total, prev, pager, next"
+              layout="total, sizes, prev, pager, next"
+              :page-sizes="[10, 20, 50, 100]"
               :total="operationTotal"
               @current-change="loadOperation"
+              @size-change="() => { operationQuery.page = 1; loadOperation() }"
             />
           </div>
         </el-tab-pane>

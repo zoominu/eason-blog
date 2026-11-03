@@ -193,9 +193,11 @@ watch(
         <el-pagination
           v-model:current-page="query.page"
           v-model:page-size="query.size"
-          layout="total, prev, pager, next"
+          layout="total, sizes, prev, pager, next"
+          :page-sizes="[10, 20, 50, 100]"
           :total="total"
           @current-change="load"
+          @size-change="() => { query.page = 1; load() }"
         />
       </div>
     </el-card>

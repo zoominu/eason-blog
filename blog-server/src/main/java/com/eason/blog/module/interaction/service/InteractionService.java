@@ -28,6 +28,7 @@ import com.eason.blog.module.notification.mapper.NotificationMapper;
 import com.eason.blog.module.notification.vo.NotificationVO;
 import com.eason.blog.module.user.entity.User;
 import com.eason.blog.module.user.mapper.UserMapper;
+import com.eason.blog.module.user.mapper.UserRoleMapper;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -69,6 +71,7 @@ public class InteractionService {
     private final CategoryMapper categoryMapper;
     private final RateLimiter rateLimiter;
     private final ArticleTagResolver tagResolver;
+    private final UserRoleMapper userRoleMapper;
 
     public InteractionService(ArticleMapper articleMapper,
                               CommentMapper commentMapper,
@@ -79,7 +82,8 @@ public class InteractionService {
                               UserMapper userMapper,
                               CategoryMapper categoryMapper,
                               RateLimiter rateLimiter,
-                              ArticleTagResolver tagResolver) {
+                              ArticleTagResolver tagResolver,
+                              UserRoleMapper userRoleMapper) {
         this.articleMapper = articleMapper;
         this.commentMapper = commentMapper;
         this.favoriteMapper = favoriteMapper;
@@ -90,6 +94,7 @@ public class InteractionService {
         this.categoryMapper = categoryMapper;
         this.rateLimiter = rateLimiter;
         this.tagResolver = tagResolver;
+        this.userRoleMapper = userRoleMapper;
     }
 
     // ------------------------------------------------------------------ 评论
@@ -121,6 +126,9 @@ public class InteractionService {
         Map<Long, List<Comment>> byParent = all.stream()
                 .collect(Collectors.groupingBy(c -> c.getParentId() == null ? 0L : c.getParentId()));
 
+        // 博主评论打标：一次查出所有管理员 id
+        Set<Long> authorIds = new HashSet<>(userRoleMapper.selectUserIdsByRoleCode("SUPER_ADMIN"));
+
         List<Comment> roots = byParent.getOrDefault(0L, List.of());
         int total = roots.size();
         int from = Math.min((page - 1) * pageSize, total);
@@ -128,7 +136,7 @@ public class InteractionService {
 
         List<CommentVO> records = new ArrayList<>(to - from);
         for (Comment root : roots.subList(from, to)) {
-            records.add(toVO(root, byParent, users, currentUserId));
+            records.add(toVO(root, byParent, users, currentUserId, authorIds));
         }
 
         long pages = pageSize == 0 ? 0 : (total + pageSize - 1) / pageSize;
@@ -136,7 +144,7 @@ public class InteractionService {
     }
 
     private CommentVO toVO(Comment c, Map<Long, List<Comment>> byParent,
-                           Map<Long, User> users, Long currentUserId) {
+                           Map<Long, User> users, Long currentUserId, Set<Long> authorIds) {
         User user = users.get(c.getUserId());
         return new CommentVO(
                 c.getId(),
@@ -147,8 +155,9 @@ public class InteractionService {
                 c.getParentId(),
                 c.getCreateTime(),
                 currentUserId != null && currentUserId.equals(c.getUserId()),
+                authorIds.contains(c.getUserId()),
                 byParent.getOrDefault(c.getId(), List.of()).stream()
-                        .map(child -> toVO(child, byParent, users, currentUserId))
+                        .map(child -> toVO(child, byParent, users, currentUserId, authorIds))
                         .toList());
     }
 
@@ -163,6 +172,10 @@ public class InteractionService {
             parent = commentMapper.selectById(parentId);
             if (parent == null || !Objects.equals(parent.getArticleId(), articleId)) {
                 throw BusinessException.badRequest("回复的评论不存在");
+            }
+            // 不允许自己回复自己：既无意义，也容易变成刷楼
+            if (Objects.equals(parent.getUserId(), userId)) {
+                throw BusinessException.badRequest("不能回复自己的评论");
             }
         }
 
@@ -182,16 +195,25 @@ public class InteractionService {
         User author = userMapper.selectById(userId);
         String nickname = author == null ? "访客" : author.getNickname();
 
-        // 通知文章作者（本站只有一个作者，即管理员）
+        // 通知文章作者（本站只有一个作者，即管理员）：带评论摘要与定位参数
         notify(article.getAuthorId(), "COMMENT", "收到新评论",
-                nickname + " 评论了《" + article.getTitle() + "》，待审核",
-                // 读者端没有 /admin 路由，统一落到个人中心通知页，避免 404
-                "/user");
+                nickname + " 评论了《" + article.getTitle() + "》：「" + excerpt(content) + "」，待审核",
+                "/admin/comments?highlight=" + comment.getId());
         if (parent != null && !Objects.equals(parent.getUserId(), userId)) {
             notify(parent.getUserId(), "REPLY", "有人回复了你的评论",
-                    nickname + " 回复了你在《" + article.getTitle() + "》下的评论", "/article/" + article.getSlug());
+                    nickname + " 回复了你在《" + article.getTitle() + "》下的评论：「" + excerpt(content) + "」",
+                    "/article/" + article.getSlug() + "?comment=" + comment.getId());
         }
         return comment.getId();
+    }
+
+    /** 通知里只放摘要，避免长评论把列表撑爆 */
+    private String excerpt(String content) {
+        if (content == null) {
+            return "";
+        }
+        String plain = content.replaceAll("\\s+", " ").trim();
+        return plain.length() <= 40 ? plain : plain.substring(0, 40) + "…";
     }
 
     // --------------------------------------------------------------- 点赞收藏
@@ -332,6 +354,24 @@ public class InteractionService {
         notificationMapper.updateById(notification);
     }
 
+    /** 一键已读：只更新当前用户未读的通知。 */
+    @Transactional
+    public int markAllRead(Long userId) {
+        Notification update = new Notification();
+        update.setIsRead(1);
+        return notificationMapper.update(update, Wrappers.<Notification>lambdaUpdate()
+                .eq(Notification::getUserId, userId)
+                .eq(Notification::getIsRead, 0));
+    }
+
+    /** 删除已读通知。 */
+    @Transactional
+    public int deleteRead(Long userId) {
+        return notificationMapper.delete(Wrappers.<Notification>lambdaQuery()
+                .eq(Notification::getUserId, userId)
+                .eq(Notification::getIsRead, 1));
+    }
+
     private void notify(Long userId, String type, String title, String content, String link) {
         if (userId == null) {
             return;
@@ -375,7 +415,7 @@ public class InteractionService {
     // ------------------------------------------------------------ 后台审核
 
     public PageResult<AdminCommentVO> adminComments(Integer status, int pageNo, int size) {
-        Page<Comment> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 50));
+        Page<Comment> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 100));
         commentMapper.selectPage(page, Wrappers.<Comment>lambdaQuery()
                 .eq(status != null, Comment::getStatus, status)
                 .orderByDesc(Comment::getCreateTime));
@@ -418,13 +458,53 @@ public class InteractionService {
             articleMapper.updateCommentCount(comment.getArticleId(), -1);
         }
         if (approve) {
-            notify(comment.getUserId(), "SYSTEM", "评论已通过审核",
-                    "你在《" + titleOf(comment.getArticleId()) + "》下的评论已展示", "/");
+            notifyApprovedComment(comment);
         }
     }
 
+    /** 审核通过通知：带上评论摘要与文章跳转（?comment=id 用于前端高亮）。 */
+    private void notifyApprovedComment(Comment comment) {
+        Article article = articleMapper.selectById(comment.getArticleId());
+        String title = article == null ? titleOf(comment.getArticleId()) : article.getTitle();
+        String slug = article == null ? "" : article.getSlug();
+        notify(comment.getUserId(), "SYSTEM", "评论已通过审核",
+                "你在《" + title + "》下的评论「" + excerpt(comment.getContent()) + "」已展示",
+                "/article/" + slug + "?comment=" + comment.getId());
+    }
+
+    /** 批量审核评论，返回实际处理条数（已是目标状态的跳过）。 */
+    @Transactional
+    public int batchModerateComments(List<Long> ids, boolean approve) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        int changed = 0;
+        for (Long id : ids) {
+            Comment comment = commentMapper.selectById(id);
+            if (comment == null) {
+                continue;
+            }
+            int before = comment.getStatus() == null ? PENDING : comment.getStatus();
+            int after = approve ? APPROVED : REJECTED;
+            if (before == after) {
+                continue;
+            }
+            comment.setStatus(after);
+            comment.setUpdateTime(LocalDateTime.now());
+            commentMapper.updateById(comment);
+            if (after == APPROVED) {
+                articleMapper.updateCommentCount(comment.getArticleId(), 1);
+                notifyApprovedComment(comment);
+            } else if (before == APPROVED) {
+                articleMapper.updateCommentCount(comment.getArticleId(), -1);
+            }
+            changed++;
+        }
+        return changed;
+    }
+
     public PageResult<AdminGuestbookVO> adminGuestbook(Integer status, int pageNo, int size) {
-        Page<Guestbook> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 50));
+        Page<Guestbook> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 100));
         guestbookMapper.selectPage(page, Wrappers.<Guestbook>lambdaQuery()
                 .eq(status != null, Guestbook::getStatus, status)
                 .orderByDesc(Guestbook::getCreateTime));
@@ -440,6 +520,30 @@ public class InteractionService {
         guestbook.setStatus(approve ? APPROVED : REJECTED);
         guestbook.setUpdateTime(LocalDateTime.now());
         guestbookMapper.updateById(guestbook);
+    }
+
+    /** 批量审核留言。 */
+    @Transactional
+    public int batchModerateGuestbook(List<Long> ids, boolean approve) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        int changed = 0;
+        for (Long id : ids) {
+            Guestbook guestbook = guestbookMapper.selectById(id);
+            if (guestbook == null) {
+                continue;
+            }
+            int after = approve ? APPROVED : REJECTED;
+            if (guestbook.getStatus() != null && guestbook.getStatus() == after) {
+                continue;
+            }
+            guestbook.setStatus(after);
+            guestbook.setUpdateTime(LocalDateTime.now());
+            guestbookMapper.updateById(guestbook);
+            changed++;
+        }
+        return changed;
     }
 
     /**

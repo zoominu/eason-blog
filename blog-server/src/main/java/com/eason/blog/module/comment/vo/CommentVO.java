@@ -13,5 +13,6 @@ public record CommentVO(
         Long parentId,
         LocalDateTime createTime,
         boolean mine,
+        boolean author,
         List<CommentVO> replies) {
 }

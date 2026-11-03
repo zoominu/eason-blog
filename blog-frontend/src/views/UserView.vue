@@ -77,7 +77,57 @@ async function markRead(item: NotificationItem) {
     await interactionApi.markRead(item.id)
     item.read = true
   }
-  if (item.link) router.push(item.link)
+}
+
+/**
+ * 打开通知：
+ * - 审核类通知（/admin/...）属于后台，前台跳到独立后台地址；
+ * - 其余按站内路径跳转，文章通知会带 ?comment= 自动定位高亮。
+ */
+function openNotification(item: NotificationItem) {
+  markRead(item)
+  const link = item.link
+  if (!link) return
+  if (link.startsWith('/admin')) {
+    window.open(`${adminUrl.value}${link.replace('/admin', '')}`, '_blank', 'noopener')
+    return
+  }
+  router.push(link)
+}
+
+const adminUrl = computed(() => {
+  const configured = import.meta.env.VITE_ADMIN_URL
+  if (configured) return configured.replace(/\/$/, '')
+  return `${window.location.protocol}//${window.location.hostname}:5174`
+})
+
+const notifBusy = ref(false)
+const notifHint = ref('')
+
+async function markAllRead() {
+  notifBusy.value = true
+  try {
+    const result = await interactionApi.markAllRead()
+    notifHint.value = `已标记 ${result.updated} 条为已读`
+    await loadNotifications()
+  } catch (e) {
+    notifHint.value = (e as Error).message
+  } finally {
+    notifBusy.value = false
+  }
+}
+
+async function deleteReadNotifications() {
+  notifBusy.value = true
+  try {
+    const result = await interactionApi.deleteRead()
+    notifHint.value = `已删除 ${result.deleted} 条已读通知`
+    await loadNotifications()
+  } catch (e) {
+    notifHint.value = (e as Error).message
+  } finally {
+    notifBusy.value = false
+  }
 }
 
 async function saveProfile() {
@@ -246,7 +296,14 @@ watch(
     </section>
 
     <section v-else class="card block">
-      <h2>通知</h2>
+      <div class="notif-head">
+        <h2>通知</h2>
+        <div class="notif-actions">
+          <button class="btn btn-sm" :disabled="notifBusy" @click="markAllRead">一键已读</button>
+          <button class="btn btn-sm" :disabled="notifBusy" @click="deleteReadNotifications">删除已读</button>
+        </div>
+      </div>
+      <p v-if="notifHint" class="muted notif-hint">{{ notifHint }}</p>
       <p v-if="loadingNotifications" class="muted">加载中…</p>
       <div v-else-if="notifications.length" class="notice-list">
         <button
@@ -254,7 +311,7 @@ watch(
           :key="item.id"
           class="notice"
           :class="{ 'notice--unread': !item.read }"
-          @click="markRead(item)"
+          @click="openNotification(item)"
         >
           <span class="notice__head">
             <span class="notice__title">{{ item.title }}</span>
@@ -446,6 +503,33 @@ watch(
 .notice__body {
   font-size: 13px;
   line-height: 1.6;
+}
+
+.notif-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.notif-head h2 {
+  margin: 0;
+}
+
+.notif-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 12px;
+}
+
+.notif-hint {
+  font-size: 12px;
+  margin: 0 0 10px;
 }
 
 .ok {

@@ -103,11 +103,15 @@ export const moderationApi = {
     get<PageResult<AdminComment>>('/admin/comments', { ...params }),
   approveComment: (id: number) => post<void>(`/admin/comments/${id}/approve`),
   rejectComment: (id: number) => post<void>(`/admin/comments/${id}/reject`),
+  batchComments: (ids: number[], approve: boolean) =>
+    post<{ updated: number }>('/admin/comments/batch', { ids, approve }),
 
   guestbook: (params: { status?: number; page?: number; size?: number }) =>
     get<PageResult<AdminGuestbook>>('/admin/guestbook', { ...params }),
   approveGuestbook: (id: number) => post<void>(`/admin/guestbook/${id}/approve`),
   rejectGuestbook: (id: number) => post<void>(`/admin/guestbook/${id}/reject`),
+  batchGuestbook: (ids: number[], approve: boolean) =>
+    post<{ updated: number }>('/admin/guestbook/batch', { ids, approve }),
   replyGuestbook: (id: number, reply: string) =>
     instance.patch(`/api/v1/admin/guestbook/${id}/reply`, { reply }).then(() => undefined)
 }

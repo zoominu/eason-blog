@@ -109,6 +109,7 @@ export interface CommentItem {
   parentId: number
   createTime: string
   mine: boolean
+  author: boolean
   replies: CommentItem[]
 }
 

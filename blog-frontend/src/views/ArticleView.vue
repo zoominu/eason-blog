@@ -24,7 +24,7 @@ import {
   Send,
   Share2
 } from 'lucide-vue-next'
-import { articleApi, interactionApi } from '@/api'
+import { articleApi, interactionApi, siteApi } from '@/api'
 import type { ArticleDetail, CommentItem, InteractionState } from '@/api/types'
 import CommentNode from '@/components/CommentNode.vue'
 import Pagination from '@/components/Pagination.vue'
@@ -63,6 +63,7 @@ const replyTo = ref<CommentItem | null>(null)
 const submitting = ref(false)
 const commentHint = ref('')
 const lightbox = ref<string | null>(null)
+const siteConfig = ref<Record<string, string>>({})
 
 marked.setOptions({ gfm: true, breaks: false })
 
@@ -119,6 +120,13 @@ async function load(slug: string) {
   } catch (e) {
     commentsError.value = (e as Error).message
   }
+
+  // 通知里带 ?comment=ID：定位并高亮该条评论
+  const targetComment = route.query.comment
+  if (targetComment) {
+    await nextTick()
+    focusComment(String(targetComment))
+  }
 }
 
 async function loadComments(page: number) {
@@ -130,6 +138,28 @@ async function loadComments(page: number) {
   if (result.current !== 1) {
     document.getElementById('comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+}
+
+/**
+ * 滚动到指定评论并短暂高亮。
+ * 评论可能在其它分页：先找当前页，找不到就逐页找（最多 10 页）。
+ */
+async function focusComment(commentId: string) {
+  let element = document.getElementById(`comment-${commentId}`)
+  let page = commentsPage.value
+  while (!element && page < Math.min(commentsPages.value, 10)) {
+    page += 1
+    await loadComments(page)
+    await nextTick()
+    element = document.getElementById(`comment-${commentId}`)
+  }
+  if (!element) {
+    commentHint.value = '未找到该评论，可能尚未通过审核'
+    return
+  }
+  element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  element.classList.add('comment--highlight')
+  setTimeout(() => element?.classList.remove('comment--highlight'), 3200)
 }
 
 function highlightCode() {
@@ -299,20 +329,36 @@ async function toggleFavorite() {
 async function share() {
   const url = window.location.href
   const title = article.value?.title ?? SITE_NAME
+  const text = buildShareText(url)
+
+  // 系统分享优先（移动端），桌面端一般不可用
   if (navigator.share) {
     try {
-      await navigator.share({ title, url })
+      await navigator.share({ title, text, url })
       return
     } catch {
       // 用户取消，继续走复制
     }
   }
   try {
-    await copyText(url)
-    commentHint.value = '链接已复制'
+    await copyText(text)
+    commentHint.value = '分享文案已复制，可直接粘贴'
   } catch {
-    commentHint.value = url
+    commentHint.value = text
   }
+}
+
+/**
+ * 分享文案：模板由后台「系统设置 → share.template」维护，
+ * 支持 {title} / {url} / {summary}，缺省时回退到内置文案。
+ */
+function buildShareText(url: string) {
+  const template = siteConfig.value['share.template']
+    || '推荐一篇好文：{title}\n{url}'
+  return template
+    .replaceAll('{title}', article.value?.title ?? SITE_NAME)
+    .replaceAll('{url}', url)
+    .replaceAll('{summary}', article.value?.summary ?? '')
 }
 
 function startReply(comment: CommentItem) {
@@ -345,10 +391,15 @@ async function submitComment() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   load(String(route.params.slug))
   window.addEventListener('scroll', onScroll, { passive: true })
   window.addEventListener('keydown', onKeydown)
+  try {
+    siteConfig.value = await siteApi.config()
+  } catch {
+    // 配置拿不到时用内置分享文案
+  }
 })
 
 onUnmounted(() => {
@@ -541,7 +592,8 @@ watch(
 }
 
 .article {
-  max-width: 900px;
+  /* 原来 900px 在大屏上两侧空白过多；正文 + 目录共约 1200px 更平衡 */
+  max-width: 1200px;
 }
 
 .back {
@@ -606,8 +658,8 @@ watch(
 
 .body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 200px;
-  gap: 40px;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 64px;
   align-items: start;
 }
 
@@ -829,6 +881,24 @@ watch(
 
 .error {
   color: #e5484d;
+}
+
+/* 从通知跳转过来时的高亮 */
+:deep(.comment--highlight) {
+  animation: comment-flash 3s ease;
+  border-radius: 10px;
+}
+
+@keyframes comment-flash {
+  0%,
+  60% {
+    background: color-mix(in srgb, var(--accent) 16%, transparent);
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--accent) 12%, transparent);
+  }
+  100% {
+    background: transparent;
+    box-shadow: none;
+  }
 }
 
 .lightbox {

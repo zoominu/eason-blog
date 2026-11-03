@@ -34,7 +34,7 @@ public class LogQueryService {
         }
         wrapper.orderByDesc(LoginLog::getCreateTime);
 
-        Page<LoginLog> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 50));
+        Page<LoginLog> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 100));
         loginLogMapper.selectPage(page, wrapper);
         return PageResult.of(page, l -> new AdminLoginLogVO(l.getId(), l.getEmail(), l.getIp(),
                 l.getLoginStatus(), l.getMessage(), l.getCreateTime()));
@@ -47,7 +47,7 @@ public class LogQueryService {
         }
         wrapper.orderByDesc(OperationLog::getCreateTime);
 
-        Page<OperationLog> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 50));
+        Page<OperationLog> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 100));
         operationLogMapper.selectPage(page, wrapper);
         return PageResult.of(page, o -> new AdminOperationLogVO(o.getId(), o.getOperatorName(),
                 o.getModule(), o.getAction(), o.getDetail(), o.getIp(), o.getCreateTime()));

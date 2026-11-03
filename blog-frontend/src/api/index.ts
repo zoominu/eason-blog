@@ -83,6 +83,8 @@ export const interactionApi = {
   notifications: (limit = 20) => get<NotificationItem[]>('/users/me/notifications', { limit }),
   unreadCount: () => get<{ count: number }>('/users/me/notifications/unread-count'),
   markRead: (id: number) => patch<void>(`/users/me/notifications/${id}/read`),
+  markAllRead: () => patch<{ updated: number }>('/users/me/notifications/read-all'),
+  deleteRead: () => del<{ deleted: number }>('/users/me/notifications/read'),
 
   submitGuestbook: (content: string) => post<void>('/guestbook', { content })
 }

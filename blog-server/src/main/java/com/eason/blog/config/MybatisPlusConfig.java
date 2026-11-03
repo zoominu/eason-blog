@@ -14,7 +14,10 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class MybatisPlusConfig {
 
-    public static final long MAX_PAGE_SIZE = 50L;
+    /**
+     * 单页上限。后台列表允许 100 条/页，公开接口在 Controller 层仍限制 50。
+     */
+    public static final long MAX_PAGE_SIZE = 100L;
 
     @Bean
     public MybatisPlusInterceptor mybatisPlusInterceptor() {

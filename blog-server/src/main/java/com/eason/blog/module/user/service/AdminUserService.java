@@ -67,7 +67,7 @@ public class AdminUserService {
         }
         wrapper.orderByDesc(User::getRegisterTime);
 
-        Page<User> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 50));
+        Page<User> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 100));
         userMapper.selectPage(page, wrapper);
         return PageResult.of(page, u -> new AdminUserVO(
                 u.getId(), u.getUid(), u.getEmail(), u.getNickname(), u.getAvatar(), u.getStatus(),

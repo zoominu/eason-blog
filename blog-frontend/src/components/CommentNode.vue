@@ -1,52 +1,64 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import type { CommentItem } from '@/api/types'
 import { formatDateTime } from '@/utils/format'
 
 /**
- * 递归评论节点：任意层级回复都能展示。
- * 数据结构是 CommentVO.replies 嵌套，模板无法自引用，必须抽成组件。
+ * 递归评论节点。
+ *
+ * - 自己的评论不显示「回复」：后端也会拒绝自己回复自己；
+ * - 回复超过 5 条时只展示前 3 条，其余折叠；
+ * - 博主评论带「博主」标记。
  */
-defineProps<{
+const props = defineProps<{
   comment: CommentItem
   depth?: number
 }>()
 
 const emit = defineEmits<{ reply: [comment: CommentItem] }>()
 
-const collapsed = ref(false)
+const expanded = ref(false)
 const maxDepth = 3
 
-function toggle() {
-  collapsed.value = !collapsed.value
-}
+const COLLAPSE_THRESHOLD = 5
+const COLLAPSED_VISIBLE = 3
+
+const replies = computed(() => props.comment.replies ?? [])
+const shouldCollapse = computed(() => replies.value.length > COLLAPSE_THRESHOLD)
+const visibleReplies = computed(() => {
+  if (!shouldCollapse.value || expanded.value) return replies.value
+  return replies.value.slice(0, COLLAPSED_VISIBLE)
+})
+const hiddenCount = computed(() => replies.value.length - COLLAPSED_VISIBLE)
+const canNest = computed(() => (props.depth ?? 0) < maxDepth)
 </script>
 
 <template>
-  <div class="comment" :class="{ 'comment--nested': (depth ?? 0) > 0 }">
+  <div :id="`comment-${comment.id}`" class="comment" :class="{ 'comment--nested': (depth ?? 0) > 0 }">
     <div class="comment__head">
       <img v-if="comment.avatar" :src="comment.avatar" class="comment__avatar" alt="" />
       <span class="comment__name">{{ comment.nickname }}</span>
+      <span v-if="comment.author" class="badge badge--author">博主</span>
+      <span v-if="comment.mine" class="badge badge--mine">我</span>
       <span class="muted comment__time">{{ formatDateTime(comment.createTime) }}</span>
-      <span v-if="comment.mine" class="mine">我</span>
     </div>
 
     <p class="comment__content">{{ comment.content }}</p>
 
     <div class="comment__actions">
-      <button class="comment__reply" @click="emit('reply', comment)">回复</button>
+      <button v-if="!comment.mine" class="comment__reply" @click="emit('reply', comment)">回复</button>
       <button
-        v-if="comment.replies.length && (depth ?? 0) < maxDepth"
+        v-if="replies.length && canNest && shouldCollapse"
         class="comment__reply"
-        @click="toggle"
+        @click="expanded = !expanded"
       >
-        {{ collapsed ? `展开 ${comment.replies.length} 条回复` : '收起回复' }}
+        {{ expanded ? '收起回复' : `展开其余 ${hiddenCount} 条回复` }}
       </button>
     </div>
 
-    <div v-if="comment.replies.length && !collapsed" class="replies">
+    <div v-if="replies.length && canNest" class="replies">
       <CommentNode
-        v-for="child in comment.replies"
+        v-for="child in visibleReplies"
         :key="child.id"
         :comment="child"
         :depth="(depth ?? 0) + 1"
@@ -60,6 +72,7 @@ function toggle() {
 .comment {
   padding-bottom: 12px;
   border-bottom: 1px dashed var(--border);
+  scroll-margin-top: 90px;
 }
 
 .comment--nested {
@@ -74,6 +87,7 @@ function toggle() {
   align-items: center;
   gap: 8px;
   margin-bottom: 6px;
+  flex-wrap: wrap;
 }
 
 .comment__avatar {
@@ -92,12 +106,22 @@ function toggle() {
   font-size: 12px;
 }
 
-.mine {
+.badge {
   font-size: 11px;
-  color: var(--accent);
-  border: 1px solid var(--accent);
   border-radius: 999px;
   padding: 0 6px;
+  line-height: 17px;
+}
+
+.badge--mine {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+}
+
+.badge--author {
+  color: #fff;
+  background: var(--accent);
+  font-weight: 500;
 }
 
 .comment__content {

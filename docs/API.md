@@ -144,9 +144,11 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | POST/DELETE | `/articles/{id}/like` | 点赞 / 取消（幂等） |
 | POST/DELETE | `/articles/{id}/favorite` | 收藏 / 取消（幂等） |
 | GET | `/users/me/favorites` | 我的收藏（分页） |
-| GET | `/users/me/notifications` | 我的通知 |
+| GET | `/users/me/notifications` | 我的通知（`limit` 最大 50） |
 | GET | `/users/me/notifications/unread-count` | 未读数 |
 | PATCH | `/users/me/notifications/{id}/read` | 标记已读 |
+| PATCH | `/users/me/notifications/read-all` | 一键已读，返回 `{updated}` |
+| DELETE | `/users/me/notifications/read` | 删除已读通知，返回 `{deleted}` |
 
 评论请求：
 
@@ -154,8 +156,8 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 { "content": "写点什么", "parentId": null }
 ```
 
-`parentId` 为空表示顶层评论；回复时传被回复评论的 id。评论创建后 `status=0`（待审核），
-审核通过才出现在公开列表，并同步累加文章的 `comment_count`。
+`parentId` 为空表示顶层评论；回复时传被回复评论的 id（不能回复自己的评论，返回 400）。
+评论创建后 `status=0`（待审核），审核通过才出现在公开列表，并同步累加文章的 `comment_count`。
 
 `/site/config` 返回键值对：`site.title`、`site.subtitle`、`site.description`、`site.author`、`site.avatar`、`site.startDate`、`site.github`、`site.icp`。
 
@@ -290,6 +292,11 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 
 留言回复：`PATCH /admin/guestbook/{id}/reply`，body `{ "reply": "..." }`；
 回复即视为审核通过，并给留言者发站内通知。
+
+批量审核：`POST /admin/comments/batch`、`POST /admin/guestbook/batch`，
+body `{ "ids": [1,2,3], "approve": true }`，返回 `{ "updated": n }`。
+
+后台列表（评论/留言/用户/日志/资源/文章）单页上限 100，公开接口仍为 50。
 
 操作日志由 `@Audit(module, action)` 注解 + AOP 切面写入，覆盖文章增改/发布/下线/回收、
 用户禁用启用、角色调整、系统设置、评论与留言审核、资源删除等关键写操作。

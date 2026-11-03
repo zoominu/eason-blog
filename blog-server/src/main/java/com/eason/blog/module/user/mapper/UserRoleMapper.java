@@ -21,4 +21,13 @@ public interface UserRoleMapper extends BaseMapper<UserRole> {
             WHERE ur.user_id = #{userId}
             """)
     List<String> selectRoleCodesByUserId(@Param("userId") Long userId);
+
+    /** 某角色下的全部用户 id：用于给评论打「博主」标记。 */
+    @Select("""
+            SELECT ur.user_id
+            FROM blog_user_role ur
+            JOIN blog_role r ON r.id = ur.role_id
+            WHERE r.code = #{roleCode}
+            """)
+    List<Long> selectUserIdsByRoleCode(@Param("roleCode") String roleCode);
 }

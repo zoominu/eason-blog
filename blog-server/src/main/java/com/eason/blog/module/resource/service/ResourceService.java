@@ -121,7 +121,7 @@ public class ResourceService {
             wrapper.like(Resource::getOriginalName, keyword.trim());
         }
         wrapper.orderByDesc(Resource::getCreateTime);
-        Page<Resource> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 50));
+        Page<Resource> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 100));
         resourceMapper.selectPage(page, wrapper);
         return PageResult.of(page, this::toVO);
     }
