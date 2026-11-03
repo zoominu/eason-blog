@@ -64,6 +64,10 @@ async function submit() {
       </form>
 
       <p class="switch muted">
+        <RouterLink to="/forgot-password" class="link">忘记密码？</RouterLink>
+      </p>
+
+      <p class="switch muted">
         还没有账号？
         <RouterLink to="/register" class="link">注册</RouterLink>
       </p>

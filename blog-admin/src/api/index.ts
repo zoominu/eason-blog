@@ -93,6 +93,7 @@ export interface AdminGuestbook {
   nickname: string
   email: string
   content: string
+  reply?: string | null
   status: number
   createTime: string
 }
@@ -106,7 +107,9 @@ export const moderationApi = {
   guestbook: (params: { status?: number; page?: number; size?: number }) =>
     get<PageResult<AdminGuestbook>>('/admin/guestbook', { ...params }),
   approveGuestbook: (id: number) => post<void>(`/admin/guestbook/${id}/approve`),
-  rejectGuestbook: (id: number) => post<void>(`/admin/guestbook/${id}/reject`)
+  rejectGuestbook: (id: number) => post<void>(`/admin/guestbook/${id}/reject`),
+  replyGuestbook: (id: number, reply: string) =>
+    instance.patch(`/api/v1/admin/guestbook/${id}/reply`, { reply }).then(() => undefined)
 }
 
 export const userApi = {

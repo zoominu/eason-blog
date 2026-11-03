@@ -3,8 +3,11 @@ package com.eason.blog.module.auth.controller;
 import com.eason.blog.common.response.ApiResponse;
 import com.eason.blog.common.security.RateLimiter;
 import com.eason.blog.config.AppProperties;
+import com.eason.blog.module.auth.dto.ForgotPasswordRequest;
 import com.eason.blog.module.auth.dto.LoginRequest;
 import com.eason.blog.module.auth.dto.RegisterRequest;
+import com.eason.blog.module.auth.dto.ResetPasswordRequest;
+import com.eason.blog.module.auth.dto.TokenRequest;
 import com.eason.blog.module.auth.service.AuthService;
 import com.eason.blog.module.auth.vo.LoginResult;
 import com.eason.blog.module.user.vo.UserVO;
@@ -83,6 +86,34 @@ public class AuthController {
     @GetMapping("/me")
     public ApiResponse<UserVO> me(@AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(authService.currentUser(principal.getId()));
+    }
+
+    @PostMapping("/forgot-password")
+    public ApiResponse<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request,
+                                            HttpServletRequest httpRequest) {
+        String ip = clientIp(httpRequest);
+        rateLimiter.check("forgot-ip:" + ip, 10, 3600);
+        rateLimiter.check("forgot-mail:" + request.email().toLowerCase(), 3, 3600);
+        authService.requestPasswordReset(request.email());
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/reset-password")
+    public ApiResponse<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request.token(), request.newPassword());
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/verify-email")
+    public ApiResponse<Void> verifyEmail(@Valid @RequestBody TokenRequest request) {
+        authService.verifyEmail(request.token());
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/resend-verification")
+    public ApiResponse<Void> resendVerification(@AuthenticationPrincipal UserPrincipal principal) {
+        authService.resendVerification(principal.getId());
+        return ApiResponse.success();
     }
 
     private void writeAuthCookie(HttpServletResponse response, String value, Duration maxAge) {

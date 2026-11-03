@@ -14,5 +14,6 @@ public record UserVO(
         String avatar,
         String bio,
         List<String> roles,
+        boolean emailVerified,
         LocalDateTime registerTime) {
 }

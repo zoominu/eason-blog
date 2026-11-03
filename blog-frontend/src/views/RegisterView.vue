@@ -53,7 +53,7 @@ async function submit() {
   <div class="container auth">
     <div class="card panel">
       <h1>注册</h1>
-      <p class="muted">注册后可以评论、收藏和留言。</p>
+      <p class="muted">注册后可以评论、收藏和留言，我们会发一封验证邮件。</p>
 
       <form class="form" @submit.prevent="submit">
         <label class="field">

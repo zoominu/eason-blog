@@ -830,3 +830,21 @@ Nginx 使用 `$proxy_add_x_forwarded_for`，会把客户端自带的 `X-Forwarde
 **验证**：`node scripts/verify-audit.mjs` → 18/18；后端 27 个用例通过；`vue-tsc` 双端 0 error；两端 `vite build` 成功。
 
 **仍未处理**（见第 4 节功能缺失表）：RSS、找回密码、邮箱验证、评论分页、图片灯箱、博主回复留言。
+
+### 7.1 功能缺失补齐（2026-11-03 晚）
+
+第 4 节列出的 6 项能力已全部实现：
+
+| 功能 | 状态 | 说明 |
+| --- | --- | --- |
+| 找回密码 | ✅ | `/auth/forgot-password` + `/auth/reset-password`，token 单次使用、30 分钟过期 |
+| 邮箱验证 | ✅ | 注册即发验证邮件，`/auth/verify-email`、`/auth/resend-verification` |
+| 评论分页 | ✅ | 按顶层评论分页，回复完整嵌套（`/articles/{slug}/comments?page&size`） |
+| 图片灯箱 | ✅ | 正文图片点击放大，Esc/遮罩关闭 |
+| 博主回复留言 | ✅ | `PATCH /admin/guestbook/{id}/reply`，后台留言列表新增「回复」 |
+| RSS / 归档 | ✅ | `/rss.xml`、`/api/v1/archive`；nginx 增加三个 location |
+
+**代码块复制**：原实现只用 `navigator.clipboard`，在 `http://192.168.x.x` 这类非安全上下文会抛错。
+现改为先尝试 Clipboard API，失败回退 `textarea + execCommand('copy')`。
+
+验证：`node scripts/verify-features.mjs` → 17/17；后端 32 个用例通过；双端 `vue-tsc` 0 error。

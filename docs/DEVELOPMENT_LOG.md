@@ -4,6 +4,45 @@
 
 ---
 
+## 2026-11-03 · 功能缺失补齐 + 复制修复
+
+审计报告第 4 节列出的 6 项能力缺失全部实现，并修复代码块复制在非安全上下文失效的问题。
+
+### 新增功能
+
+| 功能 | 实现 |
+| --- | --- |
+| 找回密码 | V4 建 `blog_email_token`（只存 SHA-256、30 分钟、单次使用）；`/auth/forgot-password`、`/auth/reset-password`；重置后 `token_version` 自增，旧登录立即失效 |
+| 邮箱验证 | 注册即发验证邮件，`/auth/verify-email`、`/auth/resend-verification`；个人中心显示验证状态 |
+| 评论分页 | 按「顶层评论」分页，回复完整嵌套；`GET /articles/{slug}/comments?page&size` |
+| 图片灯箱 | 正文图片点击放大，Esc / 点击遮罩关闭 |
+| 博主回复留言 | `PATCH /admin/guestbook/{id}/reply`；回复即审核通过并通知留言者，后台新增「回复」弹窗 |
+| RSS / 归档 | `/rss.xml`（最新 20 篇摘要）、`/api/v1/archive` |
+
+### 复制失败修复
+
+`navigator.clipboard` 只在安全上下文可用：用 `http://192.168.x.x:5173` 从别的设备访问时，
+`writeText` 直接抛错，表现就是「点复制没反应」。现在改为先尝试 Clipboard API，
+失败则回退到隐藏 textarea + `document.execCommand('copy')`，两种路径都基于同一份代码文本。
+
+### 邮件策略
+
+默认 `app.mail.enabled=false`：邮件正文打到后端日志（含完整链接），本地开发无需 SMTP。
+生产在 `/etc/eason-blog.env` 配置 `MAIL_ENABLED=true` 与 `SPRING_MAIL_*` 即真正发信；
+发信异常只记 warn，不影响注册/重置主流程。
+
+### 验证
+
+```
+后端测试    Tests run: 32, Failures: 0（新增 AccountRecoveryTest 3 + 评论分页/留言回复 2）
+前台/后台   vue-tsc 0 error
+构建        vite build 双端成功
+```
+
+> 已知取舍：评论分页在内存中完成（单篇文章评论量小），数据量上来后应改为 SQL 分页 + 按根聚合。
+
+---
+
 ## 2026-11-03 · 审计报告修复（P0/P1/P2 共 20 项）
 
 按 `docs/AUDIT_REPORT_2026-11-03.md` 逐项修复，明细见该文档第 7 节。

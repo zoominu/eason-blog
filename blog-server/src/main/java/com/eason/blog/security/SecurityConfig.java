@@ -61,6 +61,9 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/register",
+                                "/api/v1/auth/forgot-password",
+                                "/api/v1/auth/reset-password",
+                                "/api/v1/auth/verify-email",
                                 "/actuator/health",
                                 "/actuator/info",
                                 "/swagger-ui.html",
@@ -77,6 +80,7 @@ public class SecurityConfig {
                                 "/api/v1/guestbook",
                                 "/sitemap.xml",
                                 "/robots.txt",
+                                "/rss.xml",
                                 "/uploads/**").permitAll()
                         .requestMatchers("/api/v1/admin/**").hasRole("SUPER_ADMIN")
                         .requestMatchers("/api/v1/users/**", "/api/v1/auth/me", "/api/v1/auth/logout").authenticated()

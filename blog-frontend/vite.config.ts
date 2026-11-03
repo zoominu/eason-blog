@@ -29,7 +29,12 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:8080',
         changeOrigin: false
-      }
+      },
+      // SEO/RSS 由后端生成，开发环境也走代理，避免 5173 上 404
+      '/sitemap.xml': { target: 'http://127.0.0.1:8080', changeOrigin: false },
+      '/robots.txt': { target: 'http://127.0.0.1:8080', changeOrigin: false },
+      '/rss.xml': { target: 'http://127.0.0.1:8080', changeOrigin: false },
+      '/uploads': { target: 'http://127.0.0.1:8080', changeOrigin: false }
     }
   }
 })

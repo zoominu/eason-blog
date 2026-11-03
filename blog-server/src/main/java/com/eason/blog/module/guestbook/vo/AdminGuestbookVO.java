@@ -8,6 +8,7 @@ public record AdminGuestbookVO(
         String nickname,
         String email,
         String content,
+        String reply,
         Integer status,
         LocalDateTime createTime) {
 }

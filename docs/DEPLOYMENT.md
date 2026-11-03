@@ -76,10 +76,24 @@ COOKIE_SAME_SITE=Lax
 CORS_ALLOWED_ORIGINS=https://www.eas0n.top
 UPLOAD_DIR=/var/www/eason-blog/uploads
 
+# 邮件（找回密码 / 邮箱验证）：不配则链接只写日志
+MAIL_ENABLED=true
+MAIL_FROM=Eason Blog <noreply@eas0n.top>
+SITE_URL=https://www.eas0n.top
+SPRING_MAIL_HOST=smtp.example.com
+SPRING_MAIL_PORT=465
+SPRING_MAIL_USERNAME=noreply@eas0n.top
+SPRING_MAIL_PASSWORD=<SMTP 授权码>
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_SSL_ENABLE=true
+
 # 仅首次启动需要；创建成功后删除这两行
 BLOG_ADMIN_EMAIL=you@example.com
 BLOG_ADMIN_PASSWORD=<一次性强密码>
 ```
+
+> 邮件未配置时，`forgot-password` / 注册验证链接会以 `[mail disabled]` 前缀打印到后端日志，
+> 开发环境可直接从日志复制链接；生产必须配置 SMTP，否则用户收不到重置邮件。
 
 ## 4. systemd
 

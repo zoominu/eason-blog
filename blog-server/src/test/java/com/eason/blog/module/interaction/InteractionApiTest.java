@@ -25,6 +25,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -104,15 +105,39 @@ class InteractionApiTest {
 
         mockMvc.perform(get("/api/v1/articles/" + slug + "/comments"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(0));
+                .andExpect(jsonPath("$.data.records.length()").value(0));
 
         mockMvc.perform(post("/api/v1/admin/comments/" + commentId + "/approve").cookie(adminCookie))
                 .andExpect(status().isOk());
 
         mockMvc.perform(get("/api/v1/articles/" + slug + "/comments"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(1))
-                .andExpect(jsonPath("$.data[0].content").value("这是一条测试评论"));
+                .andExpect(jsonPath("$.data.total").value(1))
+                .andExpect(jsonPath("$.data.records[0].content").value("这是一条测试评论"));
+    }
+
+    @Test
+    void commentPaginationReturnsTopLevelWithReplies() throws Exception {
+        // 两条顶层评论 + 一条回复
+        long first = createComment(null);
+        long second = createComment(null);
+        long reply = createComment(first);
+        mockMvc.perform(post("/api/v1/admin/comments/" + first + "/approve").cookie(adminCookie));
+        mockMvc.perform(post("/api/v1/admin/comments/" + second + "/approve").cookie(adminCookie));
+        mockMvc.perform(post("/api/v1/admin/comments/" + reply + "/approve").cookie(adminCookie));
+
+        // 每页 1 条顶层评论：总数按顶层计算，回复跟随其顶层评论
+        mockMvc.perform(get("/api/v1/articles/" + slug + "/comments?page=1&size=1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(2))
+                .andExpect(jsonPath("$.data.pages").value(2))
+                .andExpect(jsonPath("$.data.records.length()").value(1))
+                .andExpect(jsonPath("$.data.records[0].replies.length()").value(1));
+
+        mockMvc.perform(get("/api/v1/articles/" + slug + "/comments?page=2&size=1"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records.length()").value(1))
+                .andExpect(jsonPath("$.data.records[0].replies.length()").value(0));
     }
 
     @Test
@@ -148,6 +173,30 @@ class InteractionApiTest {
                 .andExpect(status().isOk());
         mockMvc.perform(get("/api/v1/users/me/favorites").cookie(userCookie))
                 .andExpect(jsonPath("$.data.total").value(0));
+    }
+
+    @Test
+    void guestbookReplyMarksApproved() throws Exception {
+        String content = "待回复留言-" + UUID.randomUUID().toString().substring(0, 8);
+        mockMvc.perform(post("/api/v1/guestbook").cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"" + content + "\"}"))
+                .andExpect(status().isOk());
+
+        var stored = guestbookMapper.selectList(com.baomidou.mybatisplus.core.toolkit.Wrappers
+                .<com.eason.blog.module.guestbook.entity.Guestbook>lambdaQuery()
+                .eq(com.eason.blog.module.guestbook.entity.Guestbook::getContent, content));
+        long id = stored.get(0).getId();
+
+        mockMvc.perform(patch("/api/v1/admin/guestbook/" + id + "/reply").cookie(adminCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reply\":\"谢谢留言\"}"))
+                .andExpect(status().isOk());
+
+        var replied = guestbookMapper.selectById(id);
+        org.assertj.core.api.Assertions.assertThat(replied.getStatus()).isEqualTo(1);
+        org.assertj.core.api.Assertions.assertThat(replied.getReply()).isEqualTo("谢谢留言");
+        org.assertj.core.api.Assertions.assertThat(replied.getReplyTime()).isNotNull();
     }
 
     @Test

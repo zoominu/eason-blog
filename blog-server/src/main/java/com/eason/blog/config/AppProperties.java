@@ -17,7 +17,8 @@ public record AppProperties(
         @DefaultValue BootstrapAdmin bootstrapAdmin,
         @DefaultValue Register register,
         @DefaultValue Storage storage,
-        @DefaultValue DemoData demoData) {
+        @DefaultValue DemoData demoData,
+        @DefaultValue Mail mail) {
 
     public record Jwt(
             @DefaultValue("dev-only-change-me-please-32bytes-minimum-secret") String secret,
@@ -45,5 +46,16 @@ public record AppProperties(
 
     /** 演示数据只允许在开发环境开启，生产必须为 false。 */
     public record DemoData(@DefaultValue("false") boolean enabled) {
+    }
+
+    /**
+     * 邮件：默认关闭。
+     *
+     * <p>关闭时验证/重置链接只写日志（开发环境够用），开启需同时配置 spring.mail.*。</p>
+     */
+    public record Mail(
+            @DefaultValue("false") boolean enabled,
+            @DefaultValue("Eason Blog <noreply@localhost>") String from,
+            @DefaultValue("http://localhost:5173") String siteUrl) {
     }
 }

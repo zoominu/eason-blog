@@ -92,6 +92,8 @@ public class UserServiceImpl implements UserService {
     private UserVO toVO(User user) {
         List<String> roles = userRoleMapper.selectRoleCodesByUserId(user.getId());
         return new UserVO(user.getId(), user.getUid(), user.getEmail(), user.getNickname(),
-                user.getAvatar(), user.getBio(), roles, user.getRegisterTime());
+                user.getAvatar(), user.getBio(), roles,
+                user.getEmailVerified() != null && user.getEmailVerified() == 1,
+                user.getRegisterTime());
     }
 }

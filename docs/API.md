@@ -47,7 +47,11 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | POST | `/auth/logout` | 清除 Cookie | 登录 |
 | GET | `/auth/me` | 当前用户 | 登录 |
 | PATCH | `/users/me` | 修改昵称/头像/简介 | 登录 |
-| PATCH | `/users/me/password` | 修改密码（校验旧密码） | 登录 |
+| PATCH | `/users/me/password` | 修改密码（校验旧密码，成功后旧 token 全部失效） | 登录 |
+| POST | `/auth/forgot-password` | 发送重置邮件；邮箱不存在也返回 200，防枚举 | 公开（限流） |
+| POST | `/auth/reset-password` | `{token,newPassword}`；token 单次有效，30 分钟过期 | 公开 |
+| POST | `/auth/verify-email` | `{token}`；消费邮箱验证 token | 公开 |
+| POST | `/auth/resend-verification` | 重新发送验证邮件 | 登录 |
 
 注册请求：
 
@@ -116,8 +120,12 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | --- | --- | --- |
 | GET | `/site/config` | 公开配置（仅 `is_public=1`） |
 | GET | `/site/statistics` | 文章数/阅读数/分类数/标签数/专栏数 |
-| GET | `/guestbook` | 已审核留言分页 |
+| GET | `/guestbook` | 已审核留言分页（含博主 `reply`） |
 | POST | `/guestbook` | 提交留言（登录，默认待审核） |
+| GET | `/archive` | 按年月统计的公开文章数 |
+| GET | `/rss.xml` | RSS 2.0，最新 20 篇（摘要，不含全文） |
+| GET | `/sitemap.xml` | 文章/分类/标签 URL |
+| GET | `/robots.txt` | 爬虫规则 + Sitemap 地址 |
 
 ### 3.4 搜索与专栏
 
@@ -130,7 +138,7 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/articles/{slug}/comments` | 已审核评论（树形，含 `replies`） |
+| GET | `/articles/{slug}/comments?page=&size=` | 已审核评论；按顶层评论分页，`replies` 完整嵌套 |
 | POST | `/articles/{id}/comments` | 发表评论/回复（登录，默认待审核） |
 | GET | `/articles/{id}/interaction` | 当前用户点赞/收藏状态 + 计数 |
 | POST/DELETE | `/articles/{id}/like` | 点赞 / 取消（幂等） |
@@ -279,6 +287,9 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | --- | --- | --- |
 | GET | `/admin/login-logs` | 登录日志，`status`（1 成功 / 0 失败）、`keyword` |
 | GET | `/admin/operation-logs` | 操作日志，`module` 过滤 |
+
+留言回复：`PATCH /admin/guestbook/{id}/reply`，body `{ "reply": "..." }`；
+回复即视为审核通过，并给留言者发站内通知。
 
 操作日志由 `@Audit(module, action)` 注解 + AOP 切面写入，覆盖文章增改/发布/下线/回收、
 用户禁用启用、角色调整、系统设置、评论与留言审核、资源删除等关键写操作。

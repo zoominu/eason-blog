@@ -94,14 +94,24 @@ public class InteractionService {
 
     // ------------------------------------------------------------------ 评论
 
-    public List<CommentVO> comments(String slug, Long currentUserId) {
+    /**
+     * 评论分页。
+     *
+     * <p>按“顶层评论”分页，每条顶层评论连同其全部回复一起返回：
+     * 如果按记录数分页，会把一条对话拆到两页，阅读体验很差。
+     * 数据量是单篇文章级别，内存分页足够。</p>
+     */
+    public PageResult<CommentVO> comments(String slug, Long currentUserId, int pageNo, int size) {
         Article article = requirePublicArticleBySlug(slug);
+        int page = Math.max(pageNo, 1);
+        int pageSize = Math.min(Math.max(size, 1), 50);
+
         List<Comment> all = commentMapper.selectList(Wrappers.<Comment>lambdaQuery()
                 .eq(Comment::getArticleId, article.getId())
                 .eq(Comment::getStatus, APPROVED)
                 .orderByAsc(Comment::getCreateTime));
         if (all.isEmpty()) {
-            return List.of();
+            return PageResult.empty(page, pageSize);
         }
 
         Map<Long, User> users = userMapper.selectBatchIds(
@@ -111,27 +121,35 @@ public class InteractionService {
         Map<Long, List<Comment>> byParent = all.stream()
                 .collect(Collectors.groupingBy(c -> c.getParentId() == null ? 0L : c.getParentId()));
 
-        return buildTree(byParent, 0L, users, currentUserId);
+        List<Comment> roots = byParent.getOrDefault(0L, List.of());
+        int total = roots.size();
+        int from = Math.min((page - 1) * pageSize, total);
+        int to = Math.min(from + pageSize, total);
+
+        List<CommentVO> records = new ArrayList<>(to - from);
+        for (Comment root : roots.subList(from, to)) {
+            records.add(toVO(root, byParent, users, currentUserId));
+        }
+
+        long pages = pageSize == 0 ? 0 : (total + pageSize - 1) / pageSize;
+        return new PageResult<>(records, total, page, pageSize, pages);
     }
 
-    private List<CommentVO> buildTree(Map<Long, List<Comment>> byParent, Long parentId,
-                                      Map<Long, User> users, Long currentUserId) {
-        List<Comment> children = byParent.getOrDefault(parentId, List.of());
-        List<CommentVO> result = new ArrayList<>(children.size());
-        for (Comment c : children) {
-            User user = users.get(c.getUserId());
-            result.add(new CommentVO(
-                    c.getId(),
-                    c.getUserId(),
-                    user == null ? "已注销用户" : user.getNickname(),
-                    user == null ? null : user.getAvatar(),
-                    c.getContent(),
-                    c.getParentId(),
-                    c.getCreateTime(),
-                    currentUserId != null && currentUserId.equals(c.getUserId()),
-                    buildTree(byParent, c.getId(), users, currentUserId)));
-        }
-        return result;
+    private CommentVO toVO(Comment c, Map<Long, List<Comment>> byParent,
+                           Map<Long, User> users, Long currentUserId) {
+        User user = users.get(c.getUserId());
+        return new CommentVO(
+                c.getId(),
+                c.getUserId(),
+                user == null ? "已注销用户" : user.getNickname(),
+                user == null ? null : user.getAvatar(),
+                c.getContent(),
+                c.getParentId(),
+                c.getCreateTime(),
+                currentUserId != null && currentUserId.equals(c.getUserId()),
+                byParent.getOrDefault(c.getId(), List.of()).stream()
+                        .map(child -> toVO(child, byParent, users, currentUserId))
+                        .toList());
     }
 
     @Transactional
@@ -411,7 +429,7 @@ public class InteractionService {
                 .eq(status != null, Guestbook::getStatus, status)
                 .orderByDesc(Guestbook::getCreateTime));
         return PageResult.of(page, g -> new AdminGuestbookVO(g.getId(), g.getNickname(), g.getEmail(),
-                g.getContent(), g.getStatus(), g.getCreateTime()));
+                g.getContent(), g.getReply(), g.getStatus(), g.getCreateTime()));
     }
 
     public void moderateGuestbook(Long id, boolean approve) {
@@ -422,6 +440,28 @@ public class InteractionService {
         guestbook.setStatus(approve ? APPROVED : REJECTED);
         guestbook.setUpdateTime(LocalDateTime.now());
         guestbookMapper.updateById(guestbook);
+    }
+
+    /**
+     * 博主回复留言：回复即视为审核通过（用户看到回复才有意义）。
+     */
+    public void replyGuestbook(Long id, String reply) {
+        Guestbook guestbook = guestbookMapper.selectById(id);
+        if (guestbook == null) {
+            throw BusinessException.notFound("留言不存在");
+        }
+        if (reply == null || reply.isBlank()) {
+            throw BusinessException.badRequest("回复内容不能为空");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        guestbook.setReply(reply.trim());
+        guestbook.setReplyTime(now);
+        guestbook.setStatus(APPROVED);
+        guestbook.setUpdateTime(now);
+        guestbookMapper.updateById(guestbook);
+
+        notify(guestbook.getUserId(), "SYSTEM", "留言收到回复",
+                "博主回复了你的留言：" + reply.trim(), "/guestbook");
     }
 
     // ------------------------------------------------------------------ 工具

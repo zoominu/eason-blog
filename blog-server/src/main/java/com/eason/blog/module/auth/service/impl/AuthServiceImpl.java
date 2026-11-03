@@ -2,10 +2,12 @@ package com.eason.blog.module.auth.service.impl;
 
 import com.eason.blog.common.exception.BusinessException;
 import com.eason.blog.common.exception.ErrorCode;
+import com.eason.blog.common.mail.MailService;
 import com.eason.blog.config.AppProperties;
 import com.eason.blog.module.auth.dto.LoginRequest;
 import com.eason.blog.module.auth.dto.RegisterRequest;
 import com.eason.blog.module.auth.service.AuthService;
+import com.eason.blog.module.auth.service.EmailTokenService;
 import com.eason.blog.module.auth.vo.LoginResult;
 import com.eason.blog.module.log.entity.LoginLog;
 import com.eason.blog.module.log.mapper.LoginLogMapper;
@@ -47,6 +49,8 @@ public class AuthServiceImpl implements AuthService {
     private final JwtService jwtService;
     private final AppProperties properties;
     private final LoginLogMapper loginLogMapper;
+    private final EmailTokenService emailTokenService;
+    private final MailService mailService;
 
     public AuthServiceImpl(AuthenticationManager authenticationManager,
                            UserMapper userMapper,
@@ -56,7 +60,9 @@ public class AuthServiceImpl implements AuthService {
                            PasswordEncoder passwordEncoder,
                            JwtService jwtService,
                            AppProperties properties,
-                           LoginLogMapper loginLogMapper) {
+                           LoginLogMapper loginLogMapper,
+                           EmailTokenService emailTokenService,
+                           MailService mailService) {
         this.authenticationManager = authenticationManager;
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
@@ -66,6 +72,8 @@ public class AuthServiceImpl implements AuthService {
         this.jwtService = jwtService;
         this.properties = properties;
         this.loginLogMapper = loginLogMapper;
+        this.emailTokenService = emailTokenService;
+        this.mailService = mailService;
     }
 
     @Override
@@ -95,7 +103,9 @@ public class AuthServiceImpl implements AuthService {
         String token = jwtService.issue(user.getId(), user.getEmail(), principal.getRoles(),
                 user.getTokenVersion() == null ? 0 : user.getTokenVersion());
         UserVO vo = new UserVO(user.getId(), user.getUid(), user.getEmail(), user.getNickname(),
-                user.getAvatar(), user.getBio(), principal.getRoles(), user.getRegisterTime());
+                user.getAvatar(), user.getBio(), principal.getRoles(),
+                user.getEmailVerified() != null && user.getEmailVerified() == 1,
+                user.getRegisterTime());
         return new LoginResult(token, vo);
     }
 
@@ -163,12 +173,81 @@ public class AuthServiceImpl implements AuthService {
         userRole.setCreateTime(now);
         userRoleMapper.insert(userRole);
 
+        // 注册后发一封验证邮件；邮件发送失败不影响注册结果
+        sendVerificationEmail(user);
+
         return userService.getProfile(user.getId());
     }
 
     @Override
     public UserVO currentUser(Long userId) {
         return userService.getProfile(userId);
+    }
+
+    @Override
+    public void requestPasswordReset(String email) {
+        User user = userService.getByEmail(email == null ? "" : email.trim().toLowerCase());
+        // 邮箱不存在也返回成功，避免被用来探测注册状态
+        if (user == null) {
+            return;
+        }
+        String token = emailTokenService.create(user.getId(), EmailTokenService.TYPE_RESET);
+        String link = properties.mail().siteUrl() + "/reset-password?token=" + token;
+        mailService.send(user.getEmail(), "重置 Eason Blog 密码", """
+                你好 %s：
+
+                点击下面的链接重置密码（30 分钟内有效，仅可使用一次）：
+                %s
+
+                如果不是你本人操作，请忽略这封邮件。
+                """.formatted(user.getNickname(), link));
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(String token, String newPassword) {
+        Long userId = emailTokenService.consume(token, EmailTokenService.TYPE_RESET);
+        User user = userService.getById(userId);
+        user.setPassword(passwordEncoder.encode(newPassword));
+        // 重置密码后旧 token 全部失效
+        user.setTokenVersion((user.getTokenVersion() == null ? 0 : user.getTokenVersion()) + 1);
+        user.setUpdateTime(LocalDateTime.now());
+        userMapper.updateById(user);
+    }
+
+    @Override
+    @Transactional
+    public void verifyEmail(String token) {
+        Long userId = emailTokenService.consume(token, EmailTokenService.TYPE_VERIFY);
+        User user = userService.getById(userId);
+        if (user.getEmailVerified() != null && user.getEmailVerified() == 1) {
+            return;
+        }
+        user.setEmailVerified(1);
+        user.setUpdateTime(LocalDateTime.now());
+        userMapper.updateById(user);
+    }
+
+    @Override
+    public void resendVerification(Long userId) {
+        User user = userService.getById(userId);
+        if (user.getEmailVerified() != null && user.getEmailVerified() == 1) {
+            throw BusinessException.badRequest("邮箱已验证，无需重复发送");
+        }
+        sendVerificationEmail(user);
+    }
+
+    private void sendVerificationEmail(User user) {
+        String token = emailTokenService.create(user.getId(), EmailTokenService.TYPE_VERIFY);
+        String link = properties.mail().siteUrl() + "/verify-email?token=" + token;
+        mailService.send(user.getEmail(), "验证你的 Eason Blog 邮箱", """
+                你好 %s：
+
+                点击下面的链接完成邮箱验证（24 小时内有效）：
+                %s
+
+                如果这不是你本人注册，请忽略这封邮件。
+                """.formatted(user.getNickname(), link));
     }
 
     private String truncateIp(String ip) {

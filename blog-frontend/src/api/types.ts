@@ -79,6 +79,7 @@ export interface User {
   avatar?: string | null
   bio?: string | null
   roles: string[]
+  emailVerified: boolean
   registerTime: string
 }
 

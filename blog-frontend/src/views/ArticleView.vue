@@ -27,6 +27,7 @@ import {
 import { articleApi, interactionApi } from '@/api'
 import type { ArticleDetail, CommentItem, InteractionState } from '@/api/types'
 import CommentNode from '@/components/CommentNode.vue'
+import Pagination from '@/components/Pagination.vue'
 import { useUserStore } from '@/stores/user'
 import { formatDate, formatCount } from '@/utils/format'
 import { applyArticleSeo, SITE_NAME } from '@/utils/seo'
@@ -54,11 +55,14 @@ const contentRef = ref<HTMLElement | null>(null)
 
 const interaction = ref<InteractionState>({ liked: false, favorited: false, likeCount: 0, commentCount: 0 })
 const comments = ref<CommentItem[]>([])
+const commentsPage = ref(1)
+const commentsPages = ref(0)
 const commentsError = ref('')
 const commentText = ref('')
 const replyTo = ref<CommentItem | null>(null)
 const submitting = ref(false)
 const commentHint = ref('')
+const lightbox = ref<string | null>(null)
 
 marked.setOptions({ gfm: true, breaks: false })
 
@@ -95,6 +99,7 @@ async function load(slug: string) {
   buildToc()
   highlightCode()
   addCopyButtons()
+  bindImageLightbox()
   applyArticleSeo(data)
   window.scrollTo({ top: 0 })
 
@@ -110,9 +115,20 @@ async function load(slug: string) {
     }
   }
   try {
-    comments.value = await interactionApi.comments(slug)
+    await loadComments(1)
   } catch (e) {
     commentsError.value = (e as Error).message
+  }
+}
+
+async function loadComments(page: number) {
+  if (!article.value) return
+  const result = await interactionApi.comments(String(route.params.slug), page, 10)
+  comments.value = result.records
+  commentsPage.value = result.current
+  commentsPages.value = result.pages
+  if (result.current !== 1) {
+    document.getElementById('comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
 }
 
@@ -141,18 +157,70 @@ function addCopyButtons() {
     button.className = 'code-copy'
     button.type = 'button'
     button.textContent = '复制'
-    button.addEventListener('click', async () => {
+    button.addEventListener('click', async (event) => {
+      event.preventDefault()
+      event.stopPropagation()
       const code = pre.querySelector('code')?.textContent ?? ''
       try {
-        await navigator.clipboard.writeText(code)
+        await copyText(code)
         button.textContent = '已复制'
-        setTimeout(() => (button.textContent = '复制'), 1500)
       } catch {
         button.textContent = '复制失败'
       }
+      setTimeout(() => (button.textContent = '复制'), 1500)
     })
     pre.appendChild(button)
   })
+}
+
+/**
+ * 复制文本。
+ *
+ * 优先 Clipboard API；但它只在“安全上下文”可用（HTTPS 或 localhost），
+ * 用局域网 IP 访问、或浏览器拒绝权限时 writeText 会抛错，必须回退到
+ * 临时 textarea + execCommand，否则就是“点了没反应”。
+ */
+async function copyText(text: string) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return
+    } catch {
+      // 继续走兜底方案
+    }
+  }
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.top = '-1000px'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  textarea.setSelectionRange(0, text.length)
+  const ok = document.execCommand('copy')
+  document.body.removeChild(textarea)
+  if (!ok) {
+    throw new Error('copy failed')
+  }
+}
+
+/** 正文图片点击放大 */
+function bindImageLightbox() {
+  const container = contentRef.value
+  if (!container) return
+  container.querySelectorAll('img').forEach((img) => {
+    img.classList.add('prose-img')
+    img.addEventListener('click', () => {
+      lightbox.value = (img as HTMLImageElement).currentSrc || (img as HTMLImageElement).src
+    })
+  })
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    lightbox.value = null
+  }
 }
 
 function buildToc() {
@@ -228,7 +296,7 @@ async function share() {
     }
   }
   try {
-    await navigator.clipboard.writeText(url)
+    await copyText(url)
     commentHint.value = '链接已复制'
   } catch {
     commentHint.value = url
@@ -268,9 +336,13 @@ async function submitComment() {
 onMounted(() => {
   load(String(route.params.slug))
   window.addEventListener('scroll', onScroll, { passive: true })
+  window.addEventListener('keydown', onKeydown)
 })
 
-onUnmounted(() => window.removeEventListener('scroll', onScroll))
+onUnmounted(() => {
+  window.removeEventListener('scroll', onScroll)
+  window.removeEventListener('keydown', onKeydown)
+})
 
 watch(
   () => route.params.slug,
@@ -401,6 +473,13 @@ watch(
         </div>
         <p v-else class="muted comments__empty">还没有评论，来说点什么吧。</p>
 
+        <Pagination
+          v-if="commentsPages > 1"
+          :current="commentsPage"
+          :pages="commentsPages"
+          @change="loadComments"
+        />
+
         <div id="comment-form" class="form">
           <template v-if="userStore.isLoggedIn">
             <p v-if="replyTo" class="form__reply">
@@ -429,6 +508,13 @@ watch(
       </section>
     </template>
   </div>
+
+  <!-- 图片灯箱 -->
+  <Teleport to="body">
+    <div v-if="lightbox" class="lightbox" @click="lightbox = null">
+      <img :src="lightbox" alt="" />
+    </div>
+  </Teleport>
 </template>
 
 <style scoped>
@@ -731,6 +817,29 @@ watch(
 
 .error {
   color: #e5484d;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  cursor: zoom-out;
+}
+
+.lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+:deep(.prose-img) {
+  cursor: zoom-in;
 }
 
 @media (max-width: 860px) {

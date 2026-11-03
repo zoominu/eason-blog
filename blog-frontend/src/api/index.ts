@@ -57,7 +57,12 @@ export const authApi = {
   updateProfile: (payload: { nickname?: string; avatar?: string; bio?: string }) =>
     patch<User>('/users/me', payload),
   changePassword: (oldPassword: string, newPassword: string) =>
-    patch<void>('/users/me/password', { oldPassword, newPassword })
+    patch<void>('/users/me/password', { oldPassword, newPassword }),
+  forgotPassword: (email: string) => post<void>('/auth/forgot-password', { email }),
+  resetPassword: (token: string, newPassword: string) =>
+    post<void>('/auth/reset-password', { token, newPassword }),
+  verifyEmail: (token: string) => post<void>('/auth/verify-email', { token }),
+  resendVerification: () => post<void>('/auth/resend-verification')
 }
 
 /** 互动：评论、点赞、收藏、收藏列表、通知、留言 */
@@ -68,7 +73,8 @@ export const interactionApi = {
   favorite: (articleId: number) => post<InteractionState>(`/articles/${articleId}/favorite`),
   unfavorite: (articleId: number) => del<InteractionState>(`/articles/${articleId}/favorite`),
 
-  comments: (slug: string) => get<CommentItem[]>(`/articles/${slug}/comments`),
+  comments: (slug: string, page = 1, size = 10) =>
+    get<PageResult<CommentItem>>(`/articles/${slug}/comments`, { page, size }),
   addComment: (articleId: number, content: string, parentId?: number | null) =>
     post<{ id: number }>(`/articles/${articleId}/comments`, { content, parentId }),
 
