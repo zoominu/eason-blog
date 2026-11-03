@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.eason.blog.common.exception.BusinessException;
 import com.eason.blog.common.response.PageResult;
+import com.eason.blog.common.security.RateLimiter;
 import com.eason.blog.module.article.entity.Article;
 import com.eason.blog.module.article.mapper.ArticleMapper;
 import com.eason.blog.module.article.vo.ArticleSummaryVO;
@@ -65,6 +66,7 @@ public class InteractionService {
     private final GuestbookMapper guestbookMapper;
     private final UserMapper userMapper;
     private final CategoryMapper categoryMapper;
+    private final RateLimiter rateLimiter;
 
     public InteractionService(ArticleMapper articleMapper,
                               CommentMapper commentMapper,
@@ -73,7 +75,8 @@ public class InteractionService {
                               NotificationMapper notificationMapper,
                               GuestbookMapper guestbookMapper,
                               UserMapper userMapper,
-                              CategoryMapper categoryMapper) {
+                              CategoryMapper categoryMapper,
+                              RateLimiter rateLimiter) {
         this.articleMapper = articleMapper;
         this.commentMapper = commentMapper;
         this.favoriteMapper = favoriteMapper;
@@ -82,6 +85,7 @@ public class InteractionService {
         this.guestbookMapper = guestbookMapper;
         this.userMapper = userMapper;
         this.categoryMapper = categoryMapper;
+        this.rateLimiter = rateLimiter;
     }
 
     // ------------------------------------------------------------------ 评论
@@ -128,6 +132,8 @@ public class InteractionService {
 
     @Transactional
     public Long addComment(Long userId, Long articleId, String content, Long parentId, String ip) {
+        // 防刷：同一用户每分钟最多 5 条评论
+        rateLimiter.check("comment:" + userId, 5, 60);
         Article article = requirePublicArticle(articleId);
 
         Comment parent = null;
@@ -304,6 +310,8 @@ public class InteractionService {
 
     @Transactional
     public void addGuestbook(Long userId, String content, String ip) {
+        // 防刷：同一用户 5 分钟最多 3 条留言
+        rateLimiter.check("guestbook:" + userId, 3, 300);
         User user = userMapper.selectById(userId);
         if (user == null) {
             throw BusinessException.notFound("用户不存在");

@@ -1,12 +1,20 @@
-import { del, get, patch, post } from './http'
+import instance, { del, get, patch, post } from './http'
 import type {
   AdminArticle,
   AdminArticleListItem,
+  AdminLoginLog,
+  AdminOperationLog,
+  AdminUser,
+  ApiResponse,
   ArticleUpsertPayload,
   Category,
   Column,
   DashboardData,
   PageResult,
+  PermissionItem,
+  ResourceItem,
+  RoleItem,
+  SystemConfigItem,
   Tag,
   User
 } from './types'
@@ -95,4 +103,46 @@ export const moderationApi = {
     get<PageResult<AdminGuestbook>>('/admin/guestbook', { ...params }),
   approveGuestbook: (id: number) => post<void>(`/admin/guestbook/${id}/approve`),
   rejectGuestbook: (id: number) => post<void>(`/admin/guestbook/${id}/reject`)
+}
+
+export const userApi = {
+  list: (params: { keyword?: string; status?: number; page?: number; size?: number }) =>
+    get<PageResult<AdminUser>>('/admin/users', { ...params }),
+  disable: (id: number) => post<void>(`/admin/users/${id}/disable`),
+  enable: (id: number) => post<void>(`/admin/users/${id}/enable`),
+  assignRoles: (id: number, roleIds: number[]) => patch<void>(`/admin/users/${id}/roles`, { roleIds })
+}
+
+export const roleApi = {
+  list: () => get<RoleItem[]>('/admin/roles'),
+  permissions: () => get<PermissionItem[]>('/admin/permissions'),
+  updatePermissions: (id: number, permissionIds: number[]) =>
+    patch<void>(`/admin/roles/${id}/permissions`, { permissionIds })
+}
+
+export const resourceApi = {
+  list: (params: { keyword?: string; page?: number; size?: number }) =>
+    get<PageResult<ResourceItem>>('/admin/resources', { ...params }),
+  upload: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return instance
+      .post<ApiResponse<ResourceItem>>('/admin/resources/upload', form, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      .then((res) => res.data.data)
+  },
+  remove: (id: number) => del<void>(`/admin/resources/${id}`)
+}
+
+export const logApi = {
+  loginLogs: (params: { status?: number; keyword?: string; page?: number; size?: number }) =>
+    get<PageResult<AdminLoginLog>>('/admin/login-logs', { ...params }),
+  operationLogs: (params: { module?: string; page?: number; size?: number }) =>
+    get<PageResult<AdminOperationLog>>('/admin/operation-logs', { ...params })
+}
+
+export const settingApi = {
+  list: () => get<SystemConfigItem[]>('/admin/settings'),
+  update: (configs: Record<string, string>) => patch<{ updated: number }>('/admin/settings', configs)
 }

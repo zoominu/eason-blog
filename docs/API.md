@@ -247,6 +247,60 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 
 > 评论、用户、角色、资源、日志、系统设置等接口在 P4/P5 阶段补齐。
 
+### 4.4 用户与角色
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/admin/users` | 分页；`keyword`（邮箱/昵称）、`status` |
+| POST | `/admin/users/{id}/disable` | 禁用（不能禁用自己） |
+| POST | `/admin/users/{id}/enable` | 启用 |
+| PATCH | `/admin/users/{id}/roles` | `{ "roleIds": [1,2] }`；不能移除自己的管理员角色 |
+| GET | `/admin/roles` | 角色 + 权限 id |
+| GET | `/admin/permissions` | 权限点字典 |
+| PATCH | `/admin/roles/{id}/permissions` | `{ "permissionIds": [...] }` |
+
+> 禁用后该用户的 JWT 立即失效：每次请求都会按 userId 查库校验状态。
+
+### 4.5 资源
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/admin/resources/upload` | `multipart/form-data`，字段名 `file`，≤5MB |
+| GET | `/admin/resources` | 分页，`keyword` 按文件名 |
+| DELETE | `/admin/resources/{id}` | 被文章正文引用时 409 |
+| GET | `/uploads/{yyyy}/{MM}/{name}` | 静态访问（Nginx 生产同路径） |
+
+限制：扩展名白名单 `png/jpg/jpeg/gif/webp/svg/pdf/txt/md/zip`，MIME 需为 `image/*`、`text/*` 或 `application/pdf`；
+存储名随机（UUID），原始文件名只入库不落盘，防路径穿越。
+
+### 4.6 日志
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/admin/login-logs` | 登录日志，`status`（1 成功 / 0 失败）、`keyword` |
+| GET | `/admin/operation-logs` | 操作日志，`module` 过滤 |
+
+操作日志由 `@Audit(module, action)` 注解 + AOP 切面写入，覆盖文章增改/发布/下线/回收、
+用户禁用启用、角色调整、系统设置、评论与留言审核、资源删除等关键写操作。
+
+### 4.7 系统设置
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/admin/settings` | 全部配置（含非公开） |
+| PATCH | `/admin/settings` | `{ "site.title": "…" }`，只允许更新已存在的 key |
+
+### 4.8 限流
+
+| 接口 | 限制 |
+| --- | --- |
+| `POST /auth/login` | 单 IP 60 次/分；单 IP+邮箱 10 次/分 |
+| `POST /auth/register` | 单 IP 20 次/时；单邮箱 3 次/时 |
+| `POST /articles/{id}/comments` | 单用户 5 条/分 |
+| `POST /guestbook` | 单用户 3 条/5 分 |
+
+超限返回 `429`，内存计数（单实例）；多实例部署需换 Redis 计数器。
+
 ---
 
 ## 5. 错误码
@@ -259,7 +313,7 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | 404 | 资源不存在（含未发布文章） |
 | 409 | 邮箱已注册等状态冲突 |
 | 422 | 参数校验失败（含 size 超限、排序白名单） |
-| 429 | 触发限流（P4 起启用） |
+| 429 | 触发限流（登录/注册/评论/留言） |
 | 500 | 未预期异常（响应不含堆栈与 SQL） |
 
 ## 6. 约定

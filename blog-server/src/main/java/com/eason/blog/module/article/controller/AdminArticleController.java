@@ -1,5 +1,6 @@
 package com.eason.blog.module.article.controller;
 
+import com.eason.blog.common.audit.Audit;
 import com.eason.blog.common.response.ApiResponse;
 import com.eason.blog.common.response.PageResult;
 import com.eason.blog.module.article.dto.AdminArticleQuery;
@@ -30,7 +31,7 @@ import java.util.Map;
  * 后台文章管理（/api/v1/admin/articles）。
  *
  * <p>整个 /admin/** 已由 SecurityConfig 限制为 SUPER_ADMIN；
- * author_id 取自认证主体，不接受前端传入。</p>
+ * author_id 取自认证主体，不接受前端传入。写操作带 @Audit 记录操作日志。</p>
  */
 @RestController
 @RequestMapping("/api/v1/admin/articles")
@@ -60,6 +61,7 @@ public class AdminArticleController {
     }
 
     @PostMapping
+    @Audit(module = "article", action = "新建文章")
     public ApiResponse<Map<String, Long>> create(@AuthenticationPrincipal UserPrincipal principal,
                                                  @Valid @RequestBody ArticleUpsertRequest request) {
         Long id = adminArticleService.create(principal.getId(), request);
@@ -67,30 +69,35 @@ public class AdminArticleController {
     }
 
     @PatchMapping("/{id}")
+    @Audit(module = "article", action = "更新文章")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody ArticleUpsertRequest request) {
         adminArticleService.update(id, request);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/publish")
+    @Audit(module = "article", action = "发布文章")
     public ApiResponse<Void> publish(@PathVariable Long id) {
         adminArticleService.publish(id);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/offline")
+    @Audit(module = "article", action = "下线文章")
     public ApiResponse<Void> offline(@PathVariable Long id) {
         adminArticleService.offline(id);
         return ApiResponse.success();
     }
 
     @PostMapping("/{id}/restore")
+    @Audit(module = "article", action = "恢复文章")
     public ApiResponse<Void> restore(@PathVariable Long id) {
         adminArticleService.restore(id);
         return ApiResponse.success();
     }
 
     @DeleteMapping("/{id}")
+    @Audit(module = "article", action = "移入回收站")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         adminArticleService.delete(id);
         return ApiResponse.success();

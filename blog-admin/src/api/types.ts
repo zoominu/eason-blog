@@ -148,6 +148,71 @@ export interface Category {
   articleCount: number
 }
 
+export interface AdminUser {
+  id: number
+  uid: string
+  email: string
+  nickname: string
+  avatar?: string | null
+  status: number
+  roles: string[]
+  registerTime: string
+  lastLoginTime?: string | null
+  lastLoginIp?: string | null
+}
+
+export interface RoleItem {
+  id: number
+  code: string
+  name: string
+  description?: string | null
+  permissionIds: number[]
+}
+
+export interface PermissionItem {
+  id: number
+  code: string
+  name: string
+  description?: string | null
+}
+
+export interface ResourceItem {
+  id: number
+  originalName: string
+  url: string
+  mimeType: string
+  size: number
+  sha256?: string | null
+  createTime: string
+}
+
+export interface AdminLoginLog {
+  id: number
+  email: string
+  ip?: string | null
+  loginStatus: number
+  message?: string | null
+  createTime: string
+}
+
+export interface AdminOperationLog {
+  id: number
+  operatorName?: string | null
+  module: string
+  action: string
+  detail?: string | null
+  ip?: string | null
+  createTime: string
+}
+
+export interface SystemConfigItem {
+  id: number
+  key: string
+  value?: string | null
+  description?: string | null
+  isPublic: number
+}
+
 export interface Tag {
   id: number
   name: string

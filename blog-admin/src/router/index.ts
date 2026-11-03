@@ -73,32 +73,32 @@ const router = createRouter({
         {
           path: 'users',
           name: 'users',
-          component: () => import('@/views/PlaceholderView.vue'),
-          meta: { title: '用户管理', note: '用户禁用/启用将在 P5 实现。' }
+          component: () => import('@/views/UsersView.vue'),
+          meta: { title: '用户管理' }
         },
         {
           path: 'roles',
           name: 'roles',
-          component: () => import('@/views/PlaceholderView.vue'),
-          meta: { title: '角色权限', note: 'RBAC 配置界面将在 P5 实现。' }
+          component: () => import('@/views/RolesView.vue'),
+          meta: { title: '角色权限' }
         },
         {
           path: 'resources',
           name: 'resources',
-          component: () => import('@/views/PlaceholderView.vue'),
-          meta: { title: '资源管理', note: '上传、预览与引用检查将在 P5 实现。' }
+          component: () => import('@/views/ResourcesView.vue'),
+          meta: { title: '资源管理' }
         },
         {
           path: 'logs',
           name: 'logs',
-          component: () => import('@/views/PlaceholderView.vue'),
-          meta: { title: '日志审计', note: '登录日志与操作日志将在 P5 实现。' }
+          component: () => import('@/views/LogsView.vue'),
+          meta: { title: '日志审计' }
         },
         {
           path: 'settings',
           name: 'settings',
-          component: () => import('@/views/PlaceholderView.vue'),
-          meta: { title: '系统设置', note: '站点配置与管理员资料将在 P5 实现。' }
+          component: () => import('@/views/SettingsView.vue'),
+          meta: { title: '系统设置' }
         }
       ]
     },

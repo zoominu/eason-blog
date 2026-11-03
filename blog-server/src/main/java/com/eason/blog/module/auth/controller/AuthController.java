@@ -1,6 +1,7 @@
 package com.eason.blog.module.auth.controller;
 
 import com.eason.blog.common.response.ApiResponse;
+import com.eason.blog.common.security.RateLimiter;
 import com.eason.blog.config.AppProperties;
 import com.eason.blog.module.auth.dto.LoginRequest;
 import com.eason.blog.module.auth.dto.RegisterRequest;
@@ -36,24 +37,39 @@ public class AuthController {
     private final AuthService authService;
     private final JwtService jwtService;
     private final AppProperties properties;
+    private final RateLimiter rateLimiter;
 
-    public AuthController(AuthService authService, JwtService jwtService, AppProperties properties) {
+    public AuthController(AuthService authService, JwtService jwtService, AppProperties properties,
+                          RateLimiter rateLimiter) {
         this.authService = authService;
         this.jwtService = jwtService;
         this.properties = properties;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping("/login")
     public ApiResponse<UserVO> login(@Valid @RequestBody LoginRequest request,
                                      HttpServletRequest httpRequest,
                                      HttpServletResponse httpResponse) {
-        LoginResult result = authService.login(request, clientIp(httpRequest));
+        // 同一 IP 每分钟最多 10 次登录尝试，防撞库；真实用户正常操作远低于该阈值
+        // 两级限流：单 IP 总闸 + 单账号（IP+邮箱）防撞库
+        String ip = clientIp(httpRequest);
+        rateLimiter.check("login-ip:" + ip, 60, 60);
+        rateLimiter.check("login-account:" + ip + ":" + request.email().toLowerCase(), 10, 60);
+
+        LoginResult result = authService.login(request, ip);
         writeAuthCookie(httpResponse, result.token(), Duration.ofMinutes(jwtService.expireMinutes()));
         return ApiResponse.success(result.user());
     }
 
     @PostMapping("/register")
-    public ApiResponse<UserVO> register(@Valid @RequestBody RegisterRequest request) {
+    public ApiResponse<UserVO> register(@Valid @RequestBody RegisterRequest request,
+                                        HttpServletRequest httpRequest) {
+        // 注册更敏感：单 IP 每小时 20 个账号 + 单邮箱每小时 3 次
+        String ip = clientIp(httpRequest);
+        rateLimiter.check("register-ip:" + ip, 20, 3600);
+        rateLimiter.check("register-mail:" + request.email().toLowerCase(), 3, 3600);
+
         return ApiResponse.success(authService.register(request));
     }
 
