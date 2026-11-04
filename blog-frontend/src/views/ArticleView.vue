@@ -154,12 +154,15 @@ async function loadComments(page: number) {
  */
 async function focusComment(commentId: string, options: { stripQuery?: boolean } = {}) {
   let element = document.getElementById(`comment-${commentId}`)
-  let page = commentsPage.value
-  while (!element && page < Math.min(commentsPages.value, 10)) {
-    page += 1
-    await loadComments(page)
-    await nextTick()
-    element = document.getElementById(`comment-${commentId}`)
+  if (!element) {
+    // 评论可能在任意一页：逐页找（最多 10 页）
+    const totalPages = Math.min(Math.max(commentsPages.value, 1), 10)
+    for (let page = 1; page <= totalPages && !element; page++) {
+      if (page === commentsPage.value) continue
+      await loadComments(page)
+      await nextTick()
+      element = document.getElementById(`comment-${commentId}`)
+    }
   }
   if (!element) {
     commentHint.value = '未找到该评论，可能已被删除'
@@ -427,6 +430,19 @@ async function submitComment() {
     submitting.value = false
   }
 }
+
+// 同页点击通知（只改 query）不会重新 mount，需要监听 ?comment= 变化
+watch(
+  () => route.query.comment,
+  async (value) => {
+    if (!value || !article.value) return
+    focusCommentId.value = Number(value) || null
+    // 通知可能是刚产生的评论：先刷新当前页，再逐页查找
+    await loadComments(commentsPage.value || 1)
+    await nextTick()
+    await focusComment(String(value), { stripQuery: true })
+  }
+)
 
 onMounted(async () => {
   load(String(route.params.slug))
@@ -921,10 +937,12 @@ watch(
   color: #e5484d;
 }
 
-/* 从通知跳转过来时的高亮 */
-:deep(.comment--highlight) {
+/* 从通知跳转过来时的高亮：只覆盖这一条评论自己的头部与正文，不连带子评论 */
+:deep(.comment--highlight > .comment__head),
+:deep(.comment--highlight > .comment__content),
+:deep(.comment--highlight > .comment__hidden) {
   animation: comment-flash 3s ease;
-  border-radius: 10px;
+  border-radius: 8px;
 }
 
 @keyframes comment-flash {

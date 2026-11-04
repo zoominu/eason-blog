@@ -166,7 +166,8 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 - 审核关闭时按违禁词策略处理（见 4.7）；
 - 父评论被拒绝但下面还有已通过回复时，父节点以 `hidden=true`、内容「当前评论已被隐藏」占位返回，
   回复照常展示；删除父评论会连同其下所有回复一起删除；
-- 「评论已通过审核」通知只发第一次，之后拒绝再通过不重复通知。
+- 「评论已通过审核」通知只发第一次，之后拒绝再通过不重复通知；
+- 通知链接为 `/article/{slug}?comment={id}`，同页点击（只改 query）也会重新拉取评论并定位高亮。
 
 `/site/config` 返回键值对：`site.title`、`site.subtitle`、`site.description`、`site.author`、`site.avatar`、`site.startDate`、`site.github`、`site.icp`。
 

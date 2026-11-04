@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { CommentItem } from '@/api/types'
 import { formatDateTime } from '@/utils/format'
 
@@ -20,12 +20,39 @@ const props = defineProps<{
 const emit = defineEmits<{ reply: [comment: CommentItem] }>()
 
 const expanded = ref(false)
+const contentExpanded = ref(false)
+const contentRef = ref<HTMLElement | null>(null)
+const overflowing = ref(false)
 const maxDepth = 3
 
 const COLLAPSE_THRESHOLD = 5
 const COLLAPSED_VISIBLE = 3
+const LONG_CONTENT_CHARS = 180
+const LONG_CONTENT_LINES = 6
 
 const replies = computed(() => props.comment.replies ?? [])
+
+/** 长评论先按字符/行数做初判，是否真的被截断由 max-height 实测决定 */
+const isLongContent = computed(() => {
+  if (props.comment.hidden) return false
+  const content = props.comment.content ?? ''
+  return content.length > LONG_CONTENT_CHARS || content.split('\n').length > LONG_CONTENT_LINES
+})
+
+/** 只有内容真的超过 6 行才显示「显示全部」，避免 4 行文本也弹按钮 */
+function measureOverflow() {
+  const el = contentRef.value
+  if (!el) return
+  if (contentExpanded.value) {
+    overflowing.value = true
+    return
+  }
+  overflowing.value = el.scrollHeight > el.clientHeight + 2
+}
+
+onMounted(() => nextTick(measureOverflow))
+watch(() => props.comment.content, () => nextTick(measureOverflow))
+watch(contentExpanded, () => nextTick(measureOverflow))
 
 /** 目标评论是否在自己或子孙里（用于自动展开折叠链） */
 function containsFocus(node: CommentItem, target: number): boolean {
@@ -59,7 +86,21 @@ watch(focusInside, (value) => {
     </div>
 
     <p v-if="comment.hidden" class="comment__hidden">当前评论已被隐藏</p>
-    <p v-else class="comment__content">{{ comment.content }}</p>
+    <p
+      v-else
+      ref="contentRef"
+      class="comment__content"
+      :class="{ 'comment__content--clamp': isLongContent && !contentExpanded }"
+    >
+      {{ comment.content }}
+    </p>
+    <button
+      v-if="overflowing"
+      class="comment__more"
+      @click="contentExpanded = !contentExpanded"
+    >
+      {{ contentExpanded ? '收起' : '显示全部' }}
+    </button>
 
     <!-- 最多四级：第 4 级不再提供回复入口；自己的评论、已隐藏的评论也不显示 -->
     <div v-if="!comment.mine && !comment.hidden && (depth ?? 0) < 3" class="comment__actions">
@@ -146,6 +187,24 @@ watch(focusInside, (value) => {
   color: var(--fg-soft);
   line-height: 1.7;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.comment__content--clamp {
+  /* 用 max-height 而不是 line-clamp：scrollHeight 才能反映真实高度，便于判断是否被截断 */
+  max-height: calc(1.7em * 6);
+  overflow: hidden;
+}
+
+.comment__more {
+  margin: 4px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
 }
 
 .comment__hidden {
@@ -153,6 +212,7 @@ watch(focusInside, (value) => {
   font-size: 13px;
   color: var(--muted);
   font-style: italic;
+  overflow-wrap: anywhere;
 }
 
 .comment__actions {

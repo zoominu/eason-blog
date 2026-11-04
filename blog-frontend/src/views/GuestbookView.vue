@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { MessageSquare, Send } from 'lucide-vue-next'
 import { get, post } from '@/api/http'
@@ -26,6 +26,42 @@ const loading = ref(true)
 const content = ref('')
 const submitting = ref(false)
 const hint = ref('')
+/** 展开显示全部内容的留言 id */
+const expandedIds = ref<Set<number>>(new Set())
+/** 实测被截断（超过 6 行）的留言 id，只有这些才显示「显示全部」 */
+const overflowingIds = ref<Set<number>>(new Set())
+const LONG_CONTENT_CHARS = 180
+
+function isLongMessage(message: GuestbookMessage) {
+  const text = message.content ?? ''
+  return text.length > LONG_CONTENT_CHARS || text.split('\n').length > 6
+}
+
+async function measureOverflow() {
+  await nextTick()
+  const next = new Set<number>()
+  document.querySelectorAll('.item[data-id]').forEach((el) => {
+    const content = el.querySelector('.item__content') as HTMLElement | null
+    const id = Number(el.getAttribute('data-id'))
+    if (!content || !id) return
+    if (expandedIds.value.has(id) || content.scrollHeight > content.clientHeight + 2) {
+      next.add(id)
+    }
+  })
+  overflowingIds.value = next
+}
+
+function toggleMessage(id: number) {
+  const next = new Set(expandedIds.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  expandedIds.value = next
+  measureOverflow()
+}
+
+function onResize() {
+  measureOverflow()
+}
 
 const currentPage = computed(() => Number(route.query.page ?? 1))
 
@@ -43,6 +79,7 @@ async function load() {
     // 接口异常时保持空态
   } finally {
     loading.value = false
+    await measureOverflow()
   }
 }
 
@@ -66,7 +103,11 @@ async function submit() {
   }
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('resize', onResize)
+})
+onUnmounted(() => window.removeEventListener('resize', onResize))
 watch(() => route.query.page, load)
 </script>
 
@@ -101,12 +142,24 @@ watch(() => route.query.page, load)
 
     <div v-if="loading" class="card skeleton" />
     <div v-else-if="messages.length" class="list">
-      <div v-for="message in messages" :key="message.id" class="card item">
+      <div v-for="message in messages" :key="message.id" class="card item" :data-id="message.id">
         <div class="item__head">
           <span class="item__name">{{ message.nickname }}</span>
           <span class="muted item__time">{{ formatDateTime(message.createdAt) }}</span>
         </div>
-        <p class="item__content">{{ message.content }}</p>
+        <p
+          class="item__content"
+          :class="{ 'item__content--clamp': isLongMessage(message) && !expandedIds.has(message.id) }"
+        >
+          {{ message.content }}
+        </p>
+        <button
+          v-if="overflowingIds.has(message.id)"
+          class="item__more"
+          @click="toggleMessage(message.id)"
+        >
+          {{ expandedIds.has(message.id) ? '收起' : '显示全部' }}
+        </button>
         <p v-if="message.reply" class="item__reply">博主回复：{{ message.reply }}</p>
       </div>
       <Pagination :current="currentPage" :pages="pages" @change="goPage" />
@@ -199,6 +252,24 @@ watch(() => route.query.page, load)
   font-size: 14px;
   color: var(--fg-soft);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.item__content--clamp {
+  /* max-height 便于用 scrollHeight 判断是否真的被截断 */
+  max-height: calc(1.7em * 6);
+  overflow: hidden;
+}
+
+.item__more {
+  margin: 4px 0 0;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 12px;
+  color: var(--accent);
+  cursor: pointer;
 }
 
 .item__reply {
