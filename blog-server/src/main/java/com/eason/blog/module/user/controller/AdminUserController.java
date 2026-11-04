@@ -3,11 +3,14 @@ package com.eason.blog.module.user.controller;
 import com.eason.blog.common.audit.Audit;
 import com.eason.blog.common.response.ApiResponse;
 import com.eason.blog.common.response.PageResult;
+import com.eason.blog.module.user.dto.AdminUserCreateRequest;
+import com.eason.blog.module.user.dto.AdminUserUpdateRequest;
 import com.eason.blog.module.user.service.AdminUserService;
 import com.eason.blog.module.user.vo.AdminUserVO;
 import com.eason.blog.module.user.vo.PermissionVO;
 import com.eason.blog.module.user.vo.RoleVO;
 import com.eason.blog.security.UserPrincipal;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
@@ -76,6 +79,20 @@ public class AdminUserController {
     public ApiResponse<Void> delete(@PathVariable Long id,
                                     @AuthenticationPrincipal UserPrincipal principal) {
         adminUserService.delete(id, principal.getId());
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/users")
+    @Audit(module = "user", action = "新建用户")
+    public ApiResponse<Map<String, Long>> create(@Valid @RequestBody AdminUserCreateRequest request) {
+        return ApiResponse.success(Map.of("id", adminUserService.create(request)));
+    }
+
+    @PatchMapping("/users/{id}")
+    @Audit(module = "user", action = "修改用户资料")
+    public ApiResponse<Void> update(@PathVariable Long id,
+                                    @Valid @RequestBody AdminUserUpdateRequest request) {
+        adminUserService.update(id, request);
         return ApiResponse.success();
     }
 

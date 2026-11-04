@@ -4,6 +4,28 @@
 
 ---
 
+## 2026-11-04 · 用户管理增强 / 测试数据 / 复制修复
+
+| 需求 | 处理 |
+| --- | --- |
+| 测试数据进虚拟机 | 新增 `deploy/vm/seed-demo.sh`（临时开启 demo-data 开关 → 重启 → 自动关闭），VM 已有 5 篇文章；另用新接口创建 2 个测试读者 |
+| 新增用户 | `POST /admin/users`（邮箱唯一、密码强度校验、角色可选，默认 USER）；后台用户页「新增用户」弹窗 |
+| 修改用户资料 | `PATCH /admin/users/{id}`（邮箱/昵称/头像/简介，改邮箱重置验证状态）；后台「编辑」弹窗 |
+| 资源复制链接失效 | 根因同文章页：`navigator.clipboard` 在 http IP 下不存在。改为 Clipboard API + `execCommand` 兜底，并提示「链接已复制到剪贴板」 |
+
+### 验证
+
+```
+后端测试                    Tests run: 41（新增 create/update 2 个用例）
+无头浏览器（真实 http 站点） secure=false, hasClipboard=false → 复制成功提示
+部署验收                    scripts/verify-vm.mjs 17/17
+```
+
+> 资源复制在 `http://192.168.245.131` 这种非安全上下文下实测通过：浏览器没有
+> `navigator.clipboard`，走的是隐藏 textarea + `execCommand('copy')`。
+
+---
+
 ## 2026-11-03 · 分享提示 / 排版 / 用户删除
 
 | 需求 | 处理 |

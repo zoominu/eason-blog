@@ -48,11 +48,39 @@ async function onUpload(options: { file: File }) {
 async function copyUrl(item: ResourceItem) {
   const url = `${window.location.origin}${item.url}`
   try {
-    await navigator.clipboard.writeText(url)
-    ElMessage.success('链接已复制')
+    await copyText(url)
+    ElMessage.success('链接已复制到剪贴板')
   } catch {
-    ElMessage.warning(url)
+    // 两种方式都失败时弹窗展示 URL，至少让用户能手动复制
+    ElMessageBox.alert(url, '复制失败，请手动复制', { confirmButtonText: '知道了' })
   }
+}
+
+/**
+ * 复制文本：Clipboard API 只在安全上下文可用（HTTPS / localhost），
+ * 用 http://192.168.x.x 访问后台时必须回退到 execCommand。
+ */
+async function copyText(text: string) {
+  if (navigator.clipboard && window.isSecureContext) {
+    try {
+      await navigator.clipboard.writeText(text)
+      return
+    } catch {
+      // 继续走兜底
+    }
+  }
+  const textarea = document.createElement('textarea')
+  textarea.value = text
+  textarea.setAttribute('readonly', '')
+  textarea.style.position = 'fixed'
+  textarea.style.top = '-1000px'
+  textarea.style.opacity = '0'
+  document.body.appendChild(textarea)
+  textarea.select()
+  textarea.setSelectionRange(0, text.length)
+  const ok = document.execCommand('copy')
+  document.body.removeChild(textarea)
+  if (!ok) throw new Error('copy failed')
 }
 
 async function remove(item: ResourceItem) {

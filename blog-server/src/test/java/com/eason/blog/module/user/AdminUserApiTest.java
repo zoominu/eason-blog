@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -108,5 +109,67 @@ class AdminUserApiTest {
                 .andExpect(status().isOk())
                 .andExpect(result -> assertThat(result.getResponse().getContentAsString())
                         .doesNotContain(target.getEmail()));
+    }
+
+    @Test
+    void createUserThenLogin() throws Exception {
+        String email = TestUsers.uniqueEmail("created");
+        mockMvc.perform(post("/api/v1/admin/users").cookie(adminCookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"email":"%s","password":"Passw0rd123","nickname":"后台创建"}
+                                """.formatted(email)))
+                .andExpect(status().isOk());
+
+        // 新账号可以正常登录
+        mockMvc.perform(post("/api/v1/auth/login")
+                        .contentType("application/json")
+                        .content("""
+                                {"email":"%s","password":"Passw0rd123"}
+                                """.formatted(email)))
+                .andExpect(status().isOk());
+
+        // 重复邮箱冲突
+        mockMvc.perform(post("/api/v1/admin/users").cookie(adminCookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"email":"%s","password":"Passw0rd123"}
+                                """.formatted(email)))
+                .andExpect(status().isConflict());
+
+        // 弱密码被校验拦截
+        mockMvc.perform(post("/api/v1/admin/users").cookie(adminCookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"email":"%s","password":"12345678"}
+                                """.formatted(TestUsers.uniqueEmail("weak"))))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
+    void updateUserProfile() throws Exception {
+        User target = TestUsers.create(userMapper, passwordEncoder,
+                TestUsers.uniqueEmail("edit"), PASSWORD);
+
+        String newEmail = TestUsers.uniqueEmail("edited");
+        mockMvc.perform(patch("/api/v1/admin/users/" + target.getId()).cookie(adminCookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"email":"%s","nickname":"改过的昵称","bio":"简介"}
+                                """.formatted(newEmail)))
+                .andExpect(status().isOk());
+
+        User updated = userMapper.selectById(target.getId());
+        assertThat(updated.getEmail()).isEqualTo(newEmail);
+        assertThat(updated.getNickname()).isEqualTo("改过的昵称");
+        assertThat(updated.getEmailVerified()).isZero();
+
+        // 邮箱与其他账号冲突
+        mockMvc.perform(patch("/api/v1/admin/users/" + target.getId()).cookie(adminCookie)
+                        .contentType("application/json")
+                        .content("""
+                                {"email":"%s"}
+                                """.formatted(admin.getEmail())))
+                .andExpect(status().isConflict());
     }
 }

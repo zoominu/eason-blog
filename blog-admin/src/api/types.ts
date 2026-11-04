@@ -154,6 +154,7 @@ export interface AdminUser {
   email: string
   nickname: string
   avatar?: string | null
+  bio?: string | null
   status: number
   roles: string[]
   registerTime: string

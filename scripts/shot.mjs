@@ -51,7 +51,8 @@ await send('Network.enable')
 await send('Network.setCookie', {
   name: cookieName,
   value: cookieValue,
-  domain: '127.0.0.1',
+  // 按目标站点设置域名：既支持 127.0.0.1，也支持虚拟机 IP
+  domain: new URL(url).hostname,
   path: '/',
   httpOnly: true
 })

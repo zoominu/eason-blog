@@ -85,6 +85,88 @@ async function saveRoles() {
   }
 }
 
+// ---------------- 新建用户 ----------------
+const createVisible = ref(false)
+const creating = ref(false)
+const createForm = reactive({ email: '', nickname: '', password: '', roleIds: [] as number[] })
+
+function openCreate() {
+  Object.assign(createForm, { email: '', nickname: '', password: '', roleIds: [] })
+  createVisible.value = true
+}
+
+async function submitCreate() {
+  if (!createForm.email.trim()) {
+    ElMessage.warning('请填写邮箱')
+    return
+  }
+  if (!/^(?=.*[A-Za-z])(?=.*\d).{8,72}$/.test(createForm.password)) {
+    ElMessage.warning('密码需 8-72 位且同时包含字母和数字')
+    return
+  }
+  creating.value = true
+  try {
+    await userApi.create({
+      email: createForm.email.trim(),
+      password: createForm.password,
+      nickname: createForm.nickname.trim() || undefined,
+      roleIds: createForm.roleIds.length ? createForm.roleIds : undefined
+    })
+    ElMessage.success('用户已创建')
+    createVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    creating.value = false
+  }
+}
+
+// ---------------- 编辑资料 ----------------
+const editVisible = ref(false)
+const editingUser = ref<AdminUser | null>(null)
+const editSaving = ref(false)
+const editForm = reactive({ email: '', nickname: '', avatar: '', bio: '' })
+
+function openEdit(row: AdminUser) {
+  editingUser.value = row
+  Object.assign(editForm, {
+    email: row.email,
+    nickname: row.nickname,
+    avatar: row.avatar ?? '',
+    bio: row.bio ?? ''
+  })
+  editVisible.value = true
+}
+
+async function submitEdit() {
+  if (!editingUser.value) return
+  if (!editForm.email.trim()) {
+    ElMessage.warning('邮箱不能为空')
+    return
+  }
+  if (!editForm.nickname.trim()) {
+    ElMessage.warning('昵称不能为空')
+    return
+  }
+  editSaving.value = true
+  try {
+    await userApi.update(editingUser.value.id, {
+      email: editForm.email.trim(),
+      nickname: editForm.nickname.trim(),
+      avatar: editForm.avatar.trim(),
+      bio: editForm.bio.trim()
+    })
+    ElMessage.success('资料已更新')
+    editVisible.value = false
+    await load()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    editSaving.value = false
+  }
+}
+
 onMounted(async () => {
   await load()
   try {
@@ -102,6 +184,7 @@ onMounted(async () => {
         <h2 class="page__title">用户管理</h2>
         <p class="page__desc">禁用后该用户立即无法登录（JWT 每次请求都会校验状态）</p>
       </div>
+      <el-button type="primary" @click="openCreate">新增用户</el-button>
     </header>
 
     <el-card shadow="never" class="panel">
@@ -156,8 +239,9 @@ onMounted(async () => {
         <el-table-column label="IP" width="130">
           <template #default="{ row }"><span class="mono">{{ row.lastLoginIp || '—' }}</span></template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="270" fixed="right">
           <template #default="{ row }">
+            <el-button link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button link type="primary" @click="openRoles(row)">角色</el-button>
             <el-button link :type="row.status === 1 ? 'danger' : 'success'" @click="toggleStatus(row)">
               {{ row.status === 1 ? '禁用' : '启用' }}
@@ -190,6 +274,55 @@ onMounted(async () => {
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="saveRoles">保存</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="createVisible" title="新增用户" width="480px">
+      <el-form label-position="top">
+        <el-form-item label="邮箱" required>
+          <el-input v-model="createForm.email" placeholder="user@example.com" />
+        </el-form-item>
+        <el-form-item label="昵称">
+          <el-input v-model="createForm.nickname" maxlength="50" placeholder="留空则用邮箱前缀" />
+        </el-form-item>
+        <el-form-item label="密码" required>
+          <el-input
+            v-model="createForm.password"
+            type="password"
+            show-password
+            placeholder="8-72 位，需包含字母和数字"
+          />
+        </el-form-item>
+        <el-form-item label="角色">
+          <el-select v-model="createForm.roleIds" multiple placeholder="默认普通用户" style="width: 100%">
+            <el-option v-for="role in roles" :key="role.id" :label="`${role.name}（${role.code}）`" :value="role.id" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createVisible = false">取消</el-button>
+        <el-button type="primary" :loading="creating" @click="submitCreate">创建</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="editVisible" title="编辑用户资料" width="480px">
+      <el-form label-position="top">
+        <el-form-item label="邮箱" required>
+          <el-input v-model="editForm.email" placeholder="修改后需要重新验证邮箱" />
+        </el-form-item>
+        <el-form-item label="昵称" required>
+          <el-input v-model="editForm.nickname" maxlength="50" />
+        </el-form-item>
+        <el-form-item label="头像地址">
+          <el-input v-model="editForm.avatar" placeholder="可留空，支持站内 /uploads 链接" />
+        </el-form-item>
+        <el-form-item label="个人简介">
+          <el-input v-model="editForm.bio" type="textarea" :rows="3" maxlength="500" show-word-limit />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="editVisible = false">取消</el-button>
+        <el-button type="primary" :loading="editSaving" @click="submitEdit">保存</el-button>
       </template>
     </el-dialog>
   </div>

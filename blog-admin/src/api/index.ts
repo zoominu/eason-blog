@@ -122,7 +122,11 @@ export const userApi = {
   disable: (id: number) => post<void>(`/admin/users/${id}/disable`),
   enable: (id: number) => post<void>(`/admin/users/${id}/enable`),
   assignRoles: (id: number, roleIds: number[]) => patch<void>(`/admin/users/${id}/roles`, { roleIds }),
-  remove: (id: number) => del<void>(`/admin/users/${id}`)
+  remove: (id: number) => del<void>(`/admin/users/${id}`),
+  create: (payload: { email: string; password: string; nickname?: string; roleIds?: number[] }) =>
+    post<{ id: number }>('/admin/users', payload),
+  update: (id: number, payload: { email?: string; nickname?: string; avatar?: string; bio?: string }) =>
+    patch<void>(`/admin/users/${id}`, payload)
 }
 
 export const roleApi = {

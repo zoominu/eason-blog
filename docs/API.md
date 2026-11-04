@@ -262,6 +262,8 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/admin/users` | 分页；`keyword`（邮箱/昵称）、`status` |
+| POST | `/admin/users` | 新建用户：`{email,password,nickname?,roleIds?}`，不传角色默认 `USER` |
+| PATCH | `/admin/users/{id}` | 修改资料：`{email?,nickname?,avatar?,bio?}`；改邮箱会重置验证状态 |
 | POST | `/admin/users/{id}/disable` | 禁用（不能禁用自己） |
 | POST | `/admin/users/{id}/enable` | 启用 |
 | PATCH | `/admin/users/{id}/roles` | `{ "roleIds": [1,2] }`；不能移除自己的管理员角色 |

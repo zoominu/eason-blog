@@ -16,8 +16,36 @@
 | 服务器时区 | Asia/Shanghai |
 | 运行用户 | 应用 `eason`；静态站点 `www-data` |
 
-> 生产库是空的（只有分类/标签/专栏等基础数据），演示文章只在本地开发环境加载。
+> 生产库默认只有分类/标签/专栏等基础数据；演示文章与测试用户可按第 6.4 节导入。
 > 上线第一件事：登录后台 → 文章 → 新建。
+
+### 6.4 演示数据与测试账号（已导入）
+
+当前虚拟机已导入：
+
+| 数据 | 内容 |
+| --- | --- |
+| 演示文章 | 5 篇（Java 21 / Spring Boot 骨架 / MySQL 索引 / Vue 前端 / 工程实践） |
+| 分类 / 标签 | 5 个分类、8 个标签 |
+| 测试用户 | `reader1@eason.blog`、`reader2@eason.blog`，密码均为 `Test123456` |
+
+重新导入或给新环境导入演示文章：
+
+```bash
+# 脚本在仓库 deploy/vm/seed-demo.sh
+scp deploy/vm/seed-demo.sh eason@192.168.245.131:/tmp/
+ssh eason@192.168.245.131 "sudo bash /tmp/seed-demo.sh"
+```
+
+脚本原理：临时把 `APP_DEMODATA_ENABLED=true` 写入 `/etc/eason-blog.env` 并重启，让
+`DemoDataSeeder` 幂等插入演示文章（按 slug 判重），完成后自动改回 `false` 再重启。
+
+批量补测试用户 / 示例资源（需要管理员密码）：
+
+```powershell
+cd eason-blog
+node scripts/seed-vm-demo.mjs http://192.168.245.131
+```
 
 ---
 

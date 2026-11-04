@@ -9,6 +9,8 @@ import com.eason.blog.module.user.entity.Role;
 import com.eason.blog.module.user.entity.RolePermission;
 import com.eason.blog.module.user.entity.User;
 import com.eason.blog.module.user.entity.UserRole;
+import com.eason.blog.module.user.dto.AdminUserCreateRequest;
+import com.eason.blog.module.user.dto.AdminUserUpdateRequest;
 import com.eason.blog.module.user.mapper.PermissionMapper;
 import com.eason.blog.module.user.mapper.RoleMapper;
 import com.eason.blog.module.user.mapper.RolePermissionMapper;
@@ -17,6 +19,8 @@ import com.eason.blog.module.user.mapper.UserRoleMapper;
 import com.eason.blog.module.user.vo.AdminUserVO;
 import com.eason.blog.module.user.vo.PermissionVO;
 import com.eason.blog.module.user.vo.RoleVO;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -24,6 +28,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * 用户与角色管理。
@@ -43,17 +48,20 @@ public class AdminUserService {
     private final RoleMapper roleMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
+    private final PasswordEncoder passwordEncoder;
 
     public AdminUserService(UserMapper userMapper,
                             UserRoleMapper userRoleMapper,
                             RoleMapper roleMapper,
                             RolePermissionMapper rolePermissionMapper,
-                            PermissionMapper permissionMapper) {
+                            PermissionMapper permissionMapper,
+                            PasswordEncoder passwordEncoder) {
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
         this.roleMapper = roleMapper;
         this.rolePermissionMapper = rolePermissionMapper;
         this.permissionMapper = permissionMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public PageResult<AdminUserVO> page(String keyword, Integer status, int pageNo, int size) {
@@ -70,9 +78,104 @@ public class AdminUserService {
         Page<User> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 100));
         userMapper.selectPage(page, wrapper);
         return PageResult.of(page, u -> new AdminUserVO(
-                u.getId(), u.getUid(), u.getEmail(), u.getNickname(), u.getAvatar(), u.getStatus(),
+                u.getId(), u.getUid(), u.getEmail(), u.getNickname(), u.getAvatar(), u.getBio(), u.getStatus(),
                 userRoleMapper.selectRoleCodesByUserId(u.getId()),
                 u.getRegisterTime(), u.getLastLoginTime(), u.getLastLoginIp()));
+    }
+
+    /**
+     * 后台新建用户。
+     *
+     * <p>与注册的区别：不需要邮箱验证、可指定角色；邮箱唯一性由数据库索引兜底。</p>
+     */
+    @Transactional
+    public Long create(AdminUserCreateRequest request) {
+        String email = request.email().trim().toLowerCase();
+        Long exists = userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getEmail, email));
+        if (exists != null && exists > 0) {
+            throw BusinessException.conflict("该邮箱已注册");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        User user = new User();
+        user.setUid(UUID.randomUUID().toString().replace("-", "").substring(0, 12));
+        user.setEmail(email);
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setNickname(StringUtils.hasText(request.nickname())
+                ? request.nickname().trim()
+                : email.substring(0, email.indexOf('@')));
+        user.setStatus(1);
+        user.setEmailVerified(0);
+        user.setTokenVersion(0);
+        user.setRegisterTime(now);
+        user.setCreateTime(now);
+        user.setUpdateTime(now);
+        user.setIsDeleted(0);
+        try {
+            userMapper.insert(user);
+        } catch (DuplicateKeyException ex) {
+            throw BusinessException.conflict("该邮箱已注册");
+        }
+
+        List<Long> roleIds = request.roleIds() == null ? List.of()
+                : request.roleIds().stream().filter(Objects::nonNull).distinct().toList();
+        if (roleIds.isEmpty()) {
+            Role defaultRole = roleMapper.selectByCode("USER");
+            if (defaultRole == null) {
+                throw new IllegalStateException("缺少默认角色 USER，请检查 Flyway 种子迁移");
+            }
+            roleIds = List.of(defaultRole.getId());
+        } else {
+            long found = roleMapper.selectCount(Wrappers.<Role>lambdaQuery().in(Role::getId, roleIds));
+            if (found != roleIds.size()) {
+                throw BusinessException.badRequest("存在无效的角色");
+            }
+        }
+
+        for (Long roleId : roleIds) {
+            UserRole relation = new UserRole();
+            relation.setUserId(user.getId());
+            relation.setRoleId(roleId);
+            relation.setCreateTime(now);
+            userRoleMapper.insert(relation);
+        }
+        return user.getId();
+    }
+
+    /** 后台修改用户资料：邮箱、昵称、头像、简介；null 表示不修改。 */
+    @Transactional
+    public void update(Long id, AdminUserUpdateRequest request) {
+        User user = require(id);
+
+        if (StringUtils.hasText(request.email())) {
+            String email = request.email().trim().toLowerCase();
+            if (!email.equals(user.getEmail())) {
+                Long exists = userMapper.selectCount(Wrappers.<User>lambdaQuery()
+                        .eq(User::getEmail, email)
+                        .ne(User::getId, id));
+                if (exists != null && exists > 0) {
+                    throw BusinessException.conflict("该邮箱已被其他账号使用");
+                }
+                user.setEmail(email);
+                // 邮箱变了，验证状态需要重新确认
+                user.setEmailVerified(0);
+            }
+        }
+        if (request.nickname() != null) {
+            if (!StringUtils.hasText(request.nickname())) {
+                throw BusinessException.badRequest("昵称不能为空");
+            }
+            user.setNickname(request.nickname().trim());
+        }
+        if (request.avatar() != null) {
+            user.setAvatar(request.avatar().trim());
+        }
+        if (request.bio() != null) {
+            user.setBio(request.bio().trim());
+        }
+
+        user.setUpdateTime(LocalDateTime.now());
+        userMapper.updateById(user);
     }
 
     @Transactional

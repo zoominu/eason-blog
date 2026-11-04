@@ -10,6 +10,7 @@ public record AdminUserVO(
         String email,
         String nickname,
         String avatar,
+        String bio,
         Integer status,
         List<String> roles,
         LocalDateTime registerTime,
