@@ -6,6 +6,8 @@ import vue from '@vitejs/plugin-vue'
 const inCodespaces = process.env.CODESPACES === 'true'
 
 export default defineConfig({
+  // 生产构建用 ADMIN_BASE=/admin/；开发保持 / 以便直接用 5174 访问
+  base: process.env.ADMIN_BASE ?? '/',
   plugins: [vue()],
   resolve: {
     alias: {

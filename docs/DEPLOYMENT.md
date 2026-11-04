@@ -1,5 +1,8 @@
 # 部署说明（Linux VPS / NAS）
 
+> 本次虚拟机（Ubuntu 24.04，`192.168.245.131`）的实际部署步骤、目录与运维命令
+> 见 [MAINTENANCE.md](MAINTENANCE.md)；本文是通用方案与 HTTPS/域名部署参考。
+
 目标形态：Nginx 提供 HTTPS 与静态资源，`/api/` 反向代理到 Spring Boot，MySQL 仅本机监听。
 
 ```

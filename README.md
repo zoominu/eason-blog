@@ -156,5 +156,6 @@ powershell -File scripts/build-admin.ps1
 - [API 说明](docs/API.md)
 - [数据库设计](docs/DATABASE.md)
 - [部署说明](docs/DEPLOYMENT.md)
+- [**虚拟机维护手册**](docs/MAINTENANCE.md)（部署 / 备份 / 升级 / 排错 / 文件位置）
 - [测试说明](docs/TESTING.md)
 - [开发日志](docs/DEVELOPMENT_LOG.md)

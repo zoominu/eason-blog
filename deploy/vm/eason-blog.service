@@ -1,0 +1,21 @@
+[Unit]
+Description=Eason Blog backend (Spring Boot)
+Documentation=https://github.com/zoominu/eason-blog
+After=network-online.target mysql.service
+Wants=network-online.target
+Requires=mysql.service
+
+[Service]
+Type=simple
+User=eason
+Group=eason
+WorkingDirectory=/opt/eason-blog
+EnvironmentFile=/etc/eason-blog.env
+ExecStart=/usr/bin/java -Xms256m -Xmx512m -XX:+UseG1GC -Duser.timezone=Asia/Shanghai -jar /opt/eason-blog/app/blog-server.jar
+Restart=on-failure
+RestartSec=5
+SuccessExitStatus=143
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

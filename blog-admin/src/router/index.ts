@@ -3,7 +3,8 @@ import AdminLayout from '@/layouts/AdminLayout.vue'
 import { useUserStore } from '@/stores/user'
 
 const router = createRouter({
-  history: createWebHistory(),
+  // 生产部署在 /admin/ 子路径：base 由 vite 的 BASE_URL 决定（开发为 /）
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/login',

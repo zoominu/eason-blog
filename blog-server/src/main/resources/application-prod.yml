@@ -12,7 +12,8 @@ mybatis-plus:
 
 app:
   jwt:
-    cookie-secure: true
+    # 允许用环境变量关闭：纯 HTTP 部署（如内网 IP）时必须为 false
+    cookie-secure: ${COOKIE_SECURE:true}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:https://www.eas0n.top,https://admin.eas0n.top}
 
