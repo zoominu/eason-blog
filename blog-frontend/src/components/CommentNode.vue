@@ -60,7 +60,8 @@ watch(focusInside, (value) => {
 
     <p class="comment__content">{{ comment.content }}</p>
 
-    <div v-if="!comment.mine" class="comment__actions">
+    <!-- 最多四级：第 4 级不再提供回复入口；自己的评论也不显示 -->
+    <div v-if="!comment.mine && (depth ?? 0) < 3" class="comment__actions">
       <button class="comment__reply" @click="emit('reply', comment)">回复</button>
     </div>
 
@@ -151,7 +152,7 @@ watch(focusInside, (value) => {
   gap: 12px;
 }
 
-/* 回复按钮平时隐藏，鼠标靠近评论才出现，减少视觉噪音 */
+/* 回复按钮平时隐藏，只覆盖当前这一条评论的悬停范围 */
 .comment__reply {
   margin-top: 6px;
   border: none;
@@ -164,8 +165,8 @@ watch(focusInside, (value) => {
   transition: opacity 0.15s ease;
 }
 
-.comment:hover .comment__reply,
-.comment:focus-within .comment__reply {
+.comment:hover > .comment__actions > .comment__reply,
+.comment:focus-within > .comment__actions > .comment__reply {
   opacity: 1;
 }
 

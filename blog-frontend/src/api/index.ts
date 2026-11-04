@@ -76,7 +76,7 @@ export const interactionApi = {
   comments: (slug: string, page = 1, size = 10) =>
     get<PageResult<CommentItem>>(`/articles/${slug}/comments`, { page, size }),
   addComment: (articleId: number, content: string, parentId?: number | null) =>
-    post<{ id: number }>(`/articles/${articleId}/comments`, { content, parentId }),
+    post<{ id: number; status: number }>(`/articles/${articleId}/comments`, { content, parentId }),
 
   favorites: (page = 1, size = 10) =>
     get<PageResult<ArticleSummary>>('/users/me/favorites', { page, size }),

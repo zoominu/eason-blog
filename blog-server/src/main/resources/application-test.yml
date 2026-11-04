@@ -20,6 +20,8 @@ app:
     enabled: false
   register:
     enabled: true
+  rate-limit:
+    enabled: false
 
 logging:
   level:

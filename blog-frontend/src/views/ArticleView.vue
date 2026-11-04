@@ -129,12 +129,12 @@ async function load(slug: string) {
   if (targetComment) {
     focusCommentId.value = Number(targetComment) || null
     await nextTick()
-    focusComment(String(targetComment))
+    focusComment(String(targetComment), { stripQuery: true })
   }
 }
 
 async function loadComments(page: number) {
-  if (!article.value) return
+  if (!article.value) return null
   const result = await interactionApi.comments(String(route.params.slug), page, 10)
   comments.value = result.records
   commentsPage.value = result.current
@@ -142,13 +142,16 @@ async function loadComments(page: number) {
   if (result.current !== 1) {
     document.getElementById('comments')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }
+  return result
 }
 
 /**
- * 滚动到指定评论并短暂高亮。
+ * 滚动到指定评论并短暂高亮（同一条评论只高亮一次）。
  * 评论可能在其它分页：先找当前页，找不到就逐页找（最多 10 页）。
  */
-async function focusComment(commentId: string) {
+const highlightedIds = new Set<number>()
+
+async function focusComment(commentId: string, options: { stripQuery?: boolean } = {}) {
   let element = document.getElementById(`comment-${commentId}`)
   let page = commentsPage.value
   while (!element && page < Math.min(commentsPages.value, 10)) {
@@ -162,8 +165,20 @@ async function focusComment(commentId: string) {
     return
   }
   element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  element.classList.add('comment--highlight')
-  setTimeout(() => element?.classList.remove('comment--highlight'), 3200)
+
+  const numericId = Number(commentId)
+  if (!highlightedIds.has(numericId)) {
+    highlightedIds.add(numericId)
+    element.classList.add('comment--highlight')
+    setTimeout(() => element?.classList.remove('comment--highlight'), 3200)
+  }
+
+  // 高亮后把 ?comment= 从地址栏去掉：刷新页面不会再次高亮
+  if (options.stripQuery && route.query.comment) {
+    const query = { ...route.query }
+    delete query.comment
+    router.replace({ path: route.path, query })
+  }
 }
 
 function highlightCode() {
@@ -386,13 +401,29 @@ async function submitComment() {
   if (!requireLogin() || !article.value) return
   const content = commentText.value.trim()
   if (!content) return
+  const parentId = replyTo.value?.id ?? null
   submitting.value = true
   commentHint.value = ''
   try {
-    await interactionApi.addComment(article.value.id, content, replyTo.value?.id ?? null)
+    const created = await interactionApi.addComment(article.value.id, content, parentId)
     commentText.value = ''
     replyTo.value = null
-    commentHint.value = '评论已提交，审核通过后展示'
+
+    if (created.status === 1) {
+      // 已发布：立即刷新到对应分页并高亮，不用手动刷新页面
+      if (parentId) {
+        await loadComments(commentsPage.value)
+      } else {
+        // 顶层评论按时间升序，新评论在最后一页
+        const firstPage = await interactionApi.comments(String(route.params.slug), 1, 10)
+        await loadComments(Math.max(firstPage.pages, 1))
+      }
+      await nextTick()
+      await focusComment(String(created.id))
+      showToast('评论已发布')
+    } else {
+      commentHint.value = '评论已提交，审核通过后展示'
+    }
   } catch (e) {
     commentHint.value = (e as Error).message
   } finally {

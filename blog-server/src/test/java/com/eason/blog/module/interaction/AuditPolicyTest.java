@@ -59,11 +59,13 @@ class AuditPolicyTest {
     private Cookie adminCookie;
     private Cookie userCookie;
     private String slug;
+    private User adminUser;
 
     @BeforeEach
     void setUp() throws Exception {
         String adminEmail = TestUsers.uniqueEmail("audit-admin");
         User admin = TestUsers.create(userMapper, passwordEncoder, adminEmail, PASSWORD);
+        adminUser = admin;
         TestUsers.assignRole(userRoleMapper, roleMapper, admin.getId(), "SUPER_ADMIN");
         adminCookie = login(adminEmail);
 
@@ -159,6 +161,56 @@ class AuditPolicyTest {
         mockMvc.perform(get("/api/v1/articles/" + slug + "/comments?size=50"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.records[0].content").value("正常评论"));
+    }
+
+    @Test
+    void replyDepthIsLimitedToFourLevels() throws Exception {
+        long level1 = postComment(userCookie, "层级1-" + UUID.randomUUID().toString().substring(0, 6), null);
+        long level2 = postComment(adminCookie, "层级2", level1);
+        long level3 = postComment(userCookie, "层级3", level2);
+        long level4 = postComment(adminCookie, "层级4", level3);
+
+        // 第 5 级应被拒绝
+        mockMvc.perform(post("/api/v1/articles/" + articleId() + "/comments").cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"层级5\",\"parentId\":" + level4 + "}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void adminCanFilterCommentsByKeywordAndUser() throws Exception {
+        String keyword = "筛选词-" + UUID.randomUUID().toString().substring(0, 6);
+        postComment(userCookie, keyword + "-A", null);
+        postComment(adminCookie, keyword + "-B", null);
+        postComment(userCookie, "无关内容", null);
+
+        mockMvc.perform(get("/api/v1/admin/comments?keyword=" + keyword + "&size=50").cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(2));
+
+        mockMvc.perform(get("/api/v1/admin/comments?keyword=" + keyword + "&userId=" + adminId())
+                        .cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(1));
+
+        mockMvc.perform(get("/api/v1/admin/comments?articleId=" + articleId()).cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(org.hamcrest.Matchers.greaterThanOrEqualTo(3)));
+    }
+
+    private long postComment(Cookie cookie, String content, Long parentId) throws Exception {
+        String body = mockMvc.perform(post("/api/v1/articles/" + articleId() + "/comments").cookie(cookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"" + content + "\",\"parentId\":"
+                                + (parentId == null ? "null" : parentId) + "}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        Number id = com.jayway.jsonpath.JsonPath.read(body, "$.data.id");
+        return id.longValue();
+    }
+
+    private long adminId() {
+        return adminUser.getId();
     }
 
     private long articleId() {

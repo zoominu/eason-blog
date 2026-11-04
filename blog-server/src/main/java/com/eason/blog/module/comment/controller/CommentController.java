@@ -49,12 +49,13 @@ public class CommentController {
     }
 
     @PostMapping("/{id}/comments")
-    public ApiResponse<Map<String, Long>> create(@PathVariable Long id,
-                                                 @AuthenticationPrincipal UserPrincipal principal,
-                                                 @Valid @RequestBody CommentRequest request,
-                                                 HttpServletRequest httpRequest) {
-        Long commentId = interactionService.addComment(principal.getId(), id,
+    public ApiResponse<Map<String, Object>> create(@PathVariable Long id,
+                                                   @AuthenticationPrincipal UserPrincipal principal,
+                                                   @Valid @RequestBody CommentRequest request,
+                                                   HttpServletRequest httpRequest) {
+        var created = interactionService.addComment(principal.getId(), id,
                 request.content(), request.parentId(), ClientIp.of(httpRequest));
-        return ApiResponse.success(Map.of("id", commentId));
+        // status=1 表示已发布（前端可直接刷新展示），0 表示待审核
+        return ApiResponse.success(Map.of("id", created.id(), "status", created.status()));
     }
 }

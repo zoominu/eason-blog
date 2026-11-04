@@ -18,7 +18,8 @@ public record AppProperties(
         @DefaultValue Register register,
         @DefaultValue Storage storage,
         @DefaultValue DemoData demoData,
-        @DefaultValue Mail mail) {
+        @DefaultValue Mail mail,
+        @DefaultValue RateLimit rateLimit) {
 
     public record Jwt(
             @DefaultValue("dev-only-change-me-please-32bytes-minimum-secret") String secret,
@@ -57,5 +58,13 @@ public record AppProperties(
             @DefaultValue("false") boolean enabled,
             @DefaultValue("Eason Blog <noreply@localhost>") String from,
             @DefaultValue("http://localhost:5173") String siteUrl) {
+    }
+
+    /**
+     * 接口限流开关。
+     *
+     * <p>测试环境会在一分钟内发起大量登录，必须关掉；生产保持开启。</p>
+     */
+    public record RateLimit(@DefaultValue("true") boolean enabled) {
     }
 }

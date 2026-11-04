@@ -138,8 +138,8 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| GET | `/articles/{slug}/comments?page=&size=` | 已审核评论；按顶层评论分页，`replies` 完整嵌套 |
-| POST | `/articles/{id}/comments` | 发表评论/回复（登录，默认待审核） |
+| GET | `/articles/{slug}/comments?page=&size=` | 已审核评论；按顶层评论分页，`replies` 完整嵌套（最多四级） |
+| POST | `/articles/{id}/comments` | 发表评论/回复（登录）；返回 `{id,status}`，`status=1` 表示已发布 |
 | GET | `/articles/{id}/interaction` | 当前用户点赞/收藏状态 + 计数 |
 | POST/DELETE | `/articles/{id}/like` | 点赞 / 取消（幂等） |
 | POST/DELETE | `/articles/{id}/favorite` | 收藏 / 取消（幂等） |
@@ -158,6 +158,12 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 
 `parentId` 为空表示顶层评论；回复时传被回复评论的 id（不能回复自己的评论，返回 400）。
 评论创建后 `status=0`（待审核），审核通过才出现在公开列表，并同步累加文章的 `comment_count`。
+
+限制与规则：
+
+- 评论**最多四级**，对第 4 级评论继续回复返回 400；
+- 管理员（SUPER_ADMIN）评论/回复免审，直接 `status=1`；
+- 审核关闭时按违禁词策略处理（见 4.7）。
 
 `/site/config` 返回键值对：`site.title`、`site.subtitle`、`site.description`、`site.author`、`site.avatar`、`site.startDate`、`site.github`、`site.icp`。
 
@@ -295,6 +301,13 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 
 留言回复：`PATCH /admin/guestbook/{id}/reply`，body `{ "reply": "..." }`；
 回复即视为审核通过，并给留言者发站内通知。
+
+后台列表筛选参数：
+
+| 接口 | 参数 |
+| --- | --- |
+| `GET /admin/comments` | `status`、`keyword`（内容/昵称/邮箱/文章标题）、`articleId`、`userId`、`page`、`size` |
+| `GET /admin/guestbook` | `status`、`keyword`（内容/昵称/邮箱）、`userId`、`page`、`size` |
 
 批量审核：`POST /admin/comments/batch`、`POST /admin/guestbook/batch`，
 body `{ "ids": [1,2,3], "approve": true }`，返回 `{ "updated": n }`。

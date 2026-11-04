@@ -55,6 +55,7 @@ class JwtServiceTest {
                 new AppProperties.Register(true),
                 new AppProperties.Storage("./data/uploads"),
                 new AppProperties.DemoData(false),
-                new AppProperties.Mail(false, "noreply@localhost", "http://localhost:5173"));
+                new AppProperties.Mail(false, "noreply@localhost", "http://localhost:5173"),
+                new AppProperties.RateLimit(false));
     }
 }

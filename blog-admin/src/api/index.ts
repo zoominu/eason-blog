@@ -99,14 +99,20 @@ export interface AdminGuestbook {
 }
 
 export const moderationApi = {
-  comments: (params: { status?: number; page?: number; size?: number }) =>
-    get<PageResult<AdminComment>>('/admin/comments', { ...params }),
+  comments: (params: {
+    status?: number
+    keyword?: string
+    articleId?: number
+    userId?: number
+    page?: number
+    size?: number
+  }) => get<PageResult<AdminComment>>('/admin/comments', { ...params }),
   approveComment: (id: number) => post<void>(`/admin/comments/${id}/approve`),
   rejectComment: (id: number) => post<void>(`/admin/comments/${id}/reject`),
   batchComments: (ids: number[], approve: boolean) =>
     post<{ updated: number }>('/admin/comments/batch', { ids, approve }),
 
-  guestbook: (params: { status?: number; page?: number; size?: number }) =>
+  guestbook: (params: { status?: number; keyword?: string; userId?: number; page?: number; size?: number }) =>
     get<PageResult<AdminGuestbook>>('/admin/guestbook', { ...params }),
   approveGuestbook: (id: number) => post<void>(`/admin/guestbook/${id}/approve`),
   rejectGuestbook: (id: number) => post<void>(`/admin/guestbook/${id}/reject`),

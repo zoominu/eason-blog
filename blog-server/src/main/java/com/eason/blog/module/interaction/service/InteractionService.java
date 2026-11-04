@@ -164,8 +164,12 @@ public class InteractionService {
                         .toList());
     }
 
+    /** 新增评论的结果：前端据此决定是刷新展示还是提示待审核。 */
+    public record CommentCreated(Long id, int status) {
+    }
+
     @Transactional
-    public Long addComment(Long userId, Long articleId, String content, Long parentId, String ip) {
+    public CommentCreated addComment(Long userId, Long articleId, String content, Long parentId, String ip) {
         // 防刷：同一用户每分钟最多 5 条评论
         rateLimiter.check("comment:" + userId, 5, 60);
         Article article = requirePublicArticle(articleId);
@@ -179,6 +183,10 @@ public class InteractionService {
             // 不允许自己回复自己：既无意义，也容易变成刷楼
             if (Objects.equals(parent.getUserId(), userId)) {
                 throw BusinessException.badRequest("不能回复自己的评论");
+            }
+            // 评论最多四级：父评论已经是第 4 级时不允许再回复
+            if (commentLevel(parent) >= 4) {
+                throw BusinessException.badRequest("评论最多支持四级回复");
             }
         }
 
@@ -223,7 +231,21 @@ public class InteractionService {
                     nickname + " 回复了你在《" + article.getTitle() + "》下的评论：「" + excerpt(audit.content()) + "」",
                     "/article/" + article.getSlug() + "?comment=" + comment.getId());
         }
-        return comment.getId();
+        return new CommentCreated(comment.getId(), audit.status());
+    }
+
+    /** 计算评论层级：顶层=1，回复顶层=2…… 最多向上追 10 层，避免脏数据死循环。 */
+    private int commentLevel(Comment comment) {
+        int level = 1;
+        Comment cursor = comment;
+        while (cursor.getParentId() != null && cursor.getParentId() > 0 && level < 10) {
+            cursor = commentMapper.selectById(cursor.getParentId());
+            if (cursor == null) {
+                break;
+            }
+            level++;
+        }
+        return level;
     }
 
     /** 通知里只放摘要，避免长评论把列表撑爆 */
@@ -438,11 +460,40 @@ public class InteractionService {
 
     // ------------------------------------------------------------ 后台审核
 
-    public PageResult<AdminCommentVO> adminComments(Integer status, int pageNo, int size) {
-        Page<Comment> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 100));
-        commentMapper.selectPage(page, Wrappers.<Comment>lambdaQuery()
+    /**
+     * 后台评论列表：支持按状态、文章、用户、关键字（内容/昵称/邮箱/文章标题）筛选。
+     */
+    public PageResult<AdminCommentVO> adminComments(Integer status, String keyword,
+                                                    Long articleId, Long userId,
+                                                    int pageNo, int size) {
+        var wrapper = Wrappers.<Comment>lambdaQuery()
                 .eq(status != null, Comment::getStatus, status)
-                .orderByDesc(Comment::getCreateTime));
+                .eq(articleId != null, Comment::getArticleId, articleId)
+                .eq(userId != null, Comment::getUserId, userId);
+
+        if (org.springframework.util.StringUtils.hasText(keyword)) {
+            String kw = keyword.trim();
+            List<Long> matchedUsers = userMapper.selectList(Wrappers.<User>lambdaQuery()
+                            .and(w -> w.like(User::getNickname, kw).or().like(User::getEmail, kw))
+                            .last("limit 500"))
+                    .stream().map(User::getId).toList();
+            List<Long> matchedArticles = articleMapper.selectList(Wrappers.<Article>lambdaQuery()
+                            .like(Article::getTitle, kw)
+                            .last("limit 500"))
+                    .stream().map(Article::getId).toList();
+            wrapper.and(w -> {
+                w.like(Comment::getContent, kw);
+                if (!matchedUsers.isEmpty()) {
+                    w.or().in(Comment::getUserId, matchedUsers);
+                }
+                if (!matchedArticles.isEmpty()) {
+                    w.or().in(Comment::getArticleId, matchedArticles);
+                }
+            });
+        }
+
+        Page<Comment> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 100));
+        commentMapper.selectPage(page, wrapper.orderByDesc(Comment::getCreateTime));
 
         Map<Long, Article> articles = batchArticles(page.getRecords().stream()
                 .map(Comment::getArticleId).collect(Collectors.toSet()));
@@ -527,11 +578,20 @@ public class InteractionService {
         return changed;
     }
 
-    public PageResult<AdminGuestbookVO> adminGuestbook(Integer status, int pageNo, int size) {
-        Page<Guestbook> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 100));
-        guestbookMapper.selectPage(page, Wrappers.<Guestbook>lambdaQuery()
+    /** 后台留言列表：支持状态、用户、关键字（内容/昵称/邮箱）筛选。 */
+    public PageResult<AdminGuestbookVO> adminGuestbook(Integer status, String keyword,
+                                                       Long userId, int pageNo, int size) {
+        var wrapper = Wrappers.<Guestbook>lambdaQuery()
                 .eq(status != null, Guestbook::getStatus, status)
-                .orderByDesc(Guestbook::getCreateTime));
+                .eq(userId != null, Guestbook::getUserId, userId);
+        if (org.springframework.util.StringUtils.hasText(keyword)) {
+            String kw = keyword.trim();
+            wrapper.and(w -> w.like(Guestbook::getContent, kw)
+                    .or().like(Guestbook::getNickname, kw)
+                    .or().like(Guestbook::getEmail, kw));
+        }
+        Page<Guestbook> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 100));
+        guestbookMapper.selectPage(page, wrapper.orderByDesc(Guestbook::getCreateTime));
         return PageResult.of(page, g -> new AdminGuestbookVO(g.getId(), g.getNickname(), g.getEmail(),
                 g.getContent(), g.getReply(), g.getStatus(), g.getCreateTime()));
     }

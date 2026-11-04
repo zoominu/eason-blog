@@ -2,6 +2,7 @@ package com.eason.blog.common.security;
 
 import com.eason.blog.common.exception.BusinessException;
 import com.eason.blog.common.exception.ErrorCode;
+import com.eason.blog.config.AppProperties;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayDeque;
@@ -13,14 +14,23 @@ import java.util.concurrent.ConcurrentHashMap;
  * 极简内存限流器（固定窗口）。
  *
  * <p>个人博客单实例部署，不引入 Redis；多实例部署时需换成 Redis 计数器，
- * 否则每个实例各算各的。窗口内超过阈值直接抛 429。</p>
+ * 否则每个实例各算各的。窗口内超过阈值直接抛 429。
+ * 测试环境通过 app.rate-limit.enabled=false 关闭。</p>
  */
 @Component
 public class RateLimiter {
 
     private final Map<String, Deque<Long>> hits = new ConcurrentHashMap<>();
+    private final AppProperties properties;
+
+    public RateLimiter(AppProperties properties) {
+        this.properties = properties;
+    }
 
     public void check(String key, int limit, long windowSeconds) {
+        if (!properties.rateLimit().enabled()) {
+            return;
+        }
         long now = System.currentTimeMillis();
         long windowStart = now - windowSeconds * 1000;
 

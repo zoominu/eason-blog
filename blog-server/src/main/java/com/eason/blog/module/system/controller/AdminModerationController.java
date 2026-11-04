@@ -8,6 +8,7 @@ import com.eason.blog.module.guestbook.vo.AdminGuestbookVO;
 import com.eason.blog.module.interaction.service.InteractionService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -40,9 +41,13 @@ public class AdminModerationController {
     @GetMapping("/comments")
     public ApiResponse<PageResult<AdminCommentVO>> comments(
             @RequestParam(required = false) @Min(0) @Max(2) Integer status,
+            @RequestParam(required = false) @Size(max = 100) String keyword,
+            @RequestParam(required = false) Long articleId,
+            @RequestParam(required = false) Long userId,
             @RequestParam(defaultValue = "1") @Min(1) int page,
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(interactionService.adminComments(status, page, size));
+        return ApiResponse.success(
+                interactionService.adminComments(status, keyword, articleId, userId, page, size));
     }
 
     @PostMapping("/comments/{id}/approve")
@@ -69,9 +74,11 @@ public class AdminModerationController {
     @GetMapping("/guestbook")
     public ApiResponse<PageResult<AdminGuestbookVO>> guestbook(
             @RequestParam(required = false) @Min(0) @Max(2) Integer status,
+            @RequestParam(required = false) @Size(max = 100) String keyword,
+            @RequestParam(required = false) Long userId,
             @RequestParam(defaultValue = "1") @Min(1) int page,
             @RequestParam(defaultValue = "10") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(interactionService.adminGuestbook(status, page, size));
+        return ApiResponse.success(interactionService.adminGuestbook(status, keyword, userId, page, size));
     }
 
     @PostMapping("/guestbook/{id}/approve")

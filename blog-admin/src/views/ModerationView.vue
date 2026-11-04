@@ -2,7 +2,8 @@
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { moderationApi, type AdminComment, type AdminGuestbook } from '@/api'
+import { articleApi, moderationApi, userApi, type AdminComment, type AdminGuestbook } from '@/api'
+import type { AdminArticleListItem, AdminUser } from '@/api/types'
 
 const route = useRoute()
 
@@ -19,8 +20,15 @@ const highlightId = ref<number | null>(null)
 const query = reactive({
   page: 1,
   size: 10,
-  status: 0 as number | undefined
+  status: 0 as number | undefined,
+  keyword: '',
+  articleId: undefined as number | undefined,
+  userId: undefined as number | undefined
 })
+
+/** 筛选下拉数据：文章（仅评论）与用户 */
+const articleOptions = ref<AdminArticleListItem[]>([])
+const userOptions = ref<AdminUser[]>([])
 
 const STATUS_META: Record<number, { text: string; type: 'info' | 'success' | 'danger' }> = {
   0: { text: '待审核', type: 'info' },
@@ -109,10 +117,43 @@ async function batchModerate(approve: boolean) {
   }
 }
 
-onMounted(load)
+onMounted(async () => {
+  await load()
+  // 筛选下拉：文章与用户（只取前 100 条，够用且轻量）
+  try {
+    const page = await articleApi.page({ page: 1, size: 100 })
+    articleOptions.value = page.records
+  } catch {
+    // 下拉加载失败不影响列表
+  }
+  try {
+    const page = await userApi.list({ page: 1, size: 100 })
+    userOptions.value = page.records
+  } catch {
+    // 同上
+  }
+})
+
+function search() {
+  query.page = 1
+  load()
+}
+
+function resetFilters() {
+  Object.assign(query, {
+    page: 1,
+    status: 0,
+    keyword: '',
+    articleId: undefined,
+    userId: undefined
+  })
+  load()
+}
+
 watch(() => route.path, () => {
   query.page = 1
   highlightId.value = null
+  Object.assign(query, { keyword: '', articleId: undefined, userId: undefined, status: 0 })
   load()
 })
 
@@ -154,12 +195,47 @@ async function submitReply() {
 
     <el-card shadow="never" class="panel">
       <div class="filters">
-        <el-select v-model="query.status" placeholder="全部状态" clearable style="width: 140px" @change="load">
+        <el-input
+          v-model="query.keyword"
+          :placeholder="kind === 'comments' ? '关键字：内容/昵称/邮箱/文章标题' : '关键字：内容/昵称/邮箱'"
+          clearable
+          style="width: 260px"
+          @keyup.enter="search"
+          @clear="search"
+        />
+        <el-select
+          v-if="kind === 'comments'"
+          v-model="query.articleId"
+          placeholder="全部文章"
+          clearable
+          filterable
+          style="width: 220px"
+          @change="search"
+        >
+          <el-option v-for="item in articleOptions" :key="item.id" :label="item.title" :value="item.id" />
+        </el-select>
+        <el-select
+          v-model="query.userId"
+          placeholder="全部用户"
+          clearable
+          filterable
+          style="width: 200px"
+          @change="search"
+        >
+          <el-option
+            v-for="item in userOptions"
+            :key="item.id"
+            :label="`${item.nickname}（${item.email}）`"
+            :value="item.id"
+          />
+        </el-select>
+        <el-select v-model="query.status" placeholder="全部状态" clearable style="width: 130px" @change="search">
           <el-option label="待审核" :value="0" />
           <el-option label="已通过" :value="1" />
           <el-option label="已拒绝" :value="2" />
         </el-select>
-        <el-button @click="load">刷新</el-button>
+        <el-button @click="search">查询</el-button>
+        <el-button @click="resetFilters">重置</el-button>
         <el-button type="success" plain :disabled="!selected.length" @click="batchModerate(true)">
           批量通过{{ selected.length ? ` (${selected.length})` : '' }}
         </el-button>
@@ -248,6 +324,8 @@ async function submitReply() {
 
 .filters {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   margin-bottom: 14px;
 }

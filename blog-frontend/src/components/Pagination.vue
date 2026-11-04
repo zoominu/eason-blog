@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 const props = defineProps<{
@@ -16,9 +16,24 @@ const visiblePages = computed(() => {
   return [...set].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b)
 })
 
+const jumpTo = ref('')
+
+watch(
+  () => props.current,
+  () => (jumpTo.value = '')
+)
+
 function go(page: number) {
   if (page < 1 || page > props.pages || page === props.current) return
   emit('change', page)
+}
+
+/** 页码多时提供「跳至第 N 页」，避免只能一页页点 */
+function submitJump() {
+  const page = Number(jumpTo.value)
+  if (!Number.isFinite(page)) return
+  const target = Math.min(Math.max(Math.trunc(page), 1), props.pages)
+  go(target)
 }
 </script>
 
@@ -40,6 +55,21 @@ function go(page: number) {
     <button class="pager__btn" :disabled="current >= pages" @click="go(current + 1)">
       <ChevronRight :size="16" />
     </button>
+
+    <span v-if="pages > 5" class="pager__jump">
+      跳至
+      <input
+        v-model="jumpTo"
+        class="pager__input"
+        type="number"
+        min="1"
+        :max="pages"
+        inputmode="numeric"
+        @keyup.enter="submitJump"
+      />
+      页
+      <button class="pager__btn pager__btn--go" @click="submitJump">确定</button>
+    </span>
   </nav>
 </template>
 
@@ -87,5 +117,34 @@ function go(page: number) {
 .pager__gap {
   color: var(--muted);
   font-size: 13px;
+}
+
+.pager__jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  font-size: 13px;
+  color: var(--fg-soft);
+}
+
+.pager__input {
+  width: 56px;
+  height: 34px;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--fg);
+  font-size: 13px;
+  outline: none;
+}
+
+.pager__input:focus {
+  border-color: var(--accent);
+}
+
+.pager__btn--go {
+  padding: 0 12px;
 }
 </style>
