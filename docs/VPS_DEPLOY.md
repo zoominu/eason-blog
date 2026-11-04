@@ -23,6 +23,9 @@
 > 8080 已对公网放行（Nginx `listen 8080`），可直接访问 `http://39.96.94.89:8080/`。
 > 走 8080 会绕过雷池 WAF，正式对外建议用雷池 80/443；确认雷池反代正常后，可在云安全组把 8080 收回。
 
+> 生产 profile 必须显式指定：`/etc/eason-blog.env` 里 `SPRING_PROFILES_ACTIVE=prod`。
+> 不指定时默认是 `dev`（会写演示数据、打印 SQL、加载 `db/dev` 迁移）。
+
 ## 2. 关键路径
 
 | 路径 | 内容 |
@@ -45,6 +48,10 @@
 - **上线后请立即在「个人中心 → 安全」改密码**，并同步修改 `/etc/eason-blog.env` 里的 `BLOG_ADMIN_PASSWORD`（仅用于首次初始化，改完可留空）。
 
 数据库是全新的空库，只有 Flyway 初始化的表 + 角色权限 + 系统设置；文章/分类等需要自己添加。
+
+> 首次启动时因默认 `dev` profile，自动写入了 5 篇演示文章（现在库里已有）。
+> 已在 `/etc/eason-blog.env` 加上 `SPRING_PROFILES_ACTIVE=prod`，之后不会再补演示数据。
+> 不想要演示文章的话，在后台文章管理里逐篇删除即可。
 
 ## 4. 雷池接入步骤
 
@@ -125,6 +132,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/deploy-vps.ps1 -Skip
 ## 8. 已验证
 
 - 外网 `http://39.96.94.89:8080/` → 200（公网直连，绕过雷池）
+- 外网 `http://39.96.94.89/`（雷池 80 → 8080）→ 200，`/admin/` 200，登录接口 200
 - `curl http://127.0.0.1:8080/` → 200
 - `curl http://127.0.0.1:8080/api/v1/articles?size=5` → 200
 - `curl http://127.0.0.1:8080/admin/` → 200，静态资源 200
