@@ -14,6 +14,7 @@
 | 账号 | `admin@eason.blog` / `Admin123456`（需尽快修改） |
 | 自动化 | `scripts/deploy-vps.ps1`：打包 jar + 两个 dist，上传并重启，自动等待接口 200 |
 | 备份 | `/usr/local/bin/eason-blog-backup.sh` + cron 每天 03:20，保留 14 天 |
+| 公网 8080 | Nginx 改为 `listen 8080`，外网 `http://39.96.94.89:8080/` 实测 200（绕过雷池，正式访问仍建议走 80/443） |
 
 ### 验证
 
