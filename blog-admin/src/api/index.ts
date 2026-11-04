@@ -73,8 +73,9 @@ export const columnApi = {
   remove: (id: number) => del<void>(`/admin/columns/${id}`),
   articles: (id: number) =>
     get<{ id: number; title: string; status: number; sort: number }[]>(`/admin/columns/${id}/articles`),
+  // instance 的 baseURL 已经是 /api/v1，这里只能写相对路径，否则会变成 /api/v1/api/v1/...
   setArticles: (id: number, articleIds: number[]) =>
-    instance.put(`/api/v1/admin/columns/${id}/articles`, { articleIds }).then(() => undefined)
+    instance.put(`/admin/columns/${id}/articles`, { articleIds }).then(() => undefined)
 }
 
 export interface AdminComment {
@@ -125,7 +126,7 @@ export const moderationApi = {
   batchDeleteGuestbook: (ids: number[]) =>
     post<{ deleted: number }>('/admin/guestbook/batch-delete', { ids }),
   replyGuestbook: (id: number, reply: string) =>
-    instance.patch(`/api/v1/admin/guestbook/${id}/reply`, { reply }).then(() => undefined)
+    instance.patch(`/admin/guestbook/${id}/reply`, { reply }).then(() => undefined)
 }
 
 export const userApi = {

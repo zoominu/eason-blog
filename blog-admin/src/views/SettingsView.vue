@@ -8,6 +8,8 @@ const items = ref<SystemConfigItem[]>([])
 const draft = ref<Record<string, string>>({})
 const loading = ref(true)
 const saving = ref(false)
+/** 当前展开的分组（手风琴，一次只展开一组） */
+const activeGroup = ref('')
 
 /**
  * 固定取值项用下拉，避免手输 true/false/local 拼错。
@@ -97,6 +99,10 @@ async function load() {
     const next: Record<string, string> = {}
     for (const item of items.value) next[item.key] = item.value ?? ''
     draft.value = next
+    // 手风琴默认展开第一组
+    if (!activeGroup.value) {
+      activeGroup.value = groups.value[0]?.prefix ?? ''
+    }
   } catch (e) {
     ElMessage.error((e as Error).message)
   } finally {
@@ -143,39 +149,46 @@ onMounted(load)
 
     <el-skeleton v-if="loading" :rows="6" animated />
 
-    <el-card v-for="group in groups" v-else :key="group.prefix" class="panel" shadow="never">
-      <template #header><span class="panel__title">{{ group.label }}</span></template>
-      <el-form label-position="top">
-        <el-form-item v-for="item in group.list" :key="item.key" :label="item.description || item.key">
-          <el-select
-            v-if="optionsFor(item.key)"
-            v-model="draft[item.key]"
-            style="width: 100%"
-            placeholder="请选择"
-          >
-            <el-option
-              v-for="option in optionsFor(item.key) ?? []"
-              :key="option.value"
-              :label="option.label"
-              :value="option.value"
-            />
-          </el-select>
-          <el-input
-            v-else-if="isMultiline(item)"
-            v-model="draft[item.key]"
-            type="textarea"
-            :rows="3"
-            :placeholder="item.key"
-          />
-          <el-input v-else v-model="draft[item.key]" :placeholder="item.key" />
-          <p class="hint">
-            <span class="mono">{{ item.key }}</span>
-            <el-tag v-if="item.isPublic === 1" size="small" type="success" class="tag">公开</el-tag>
-            <el-tag v-else size="small" type="info" class="tag">仅后台</el-tag>
-            <span v-if="item.key === 'share.template'" class="tag">支持 {title} {url} {summary}</span>
-          </p>
-        </el-form-item>
-      </el-form>
+    <el-card v-else class="panel" shadow="never">
+      <el-collapse v-model="activeGroup" accordion class="settings-collapse">
+        <el-collapse-item v-for="group in groups" :key="group.prefix" :name="group.prefix">
+          <template #title>
+            <span class="panel__title">{{ group.label }}</span>
+            <span class="panel__count">{{ group.list.length }} 项</span>
+          </template>
+          <el-form label-position="top">
+            <el-form-item v-for="item in group.list" :key="item.key" :label="item.description || item.key">
+              <el-select
+                v-if="optionsFor(item.key)"
+                v-model="draft[item.key]"
+                style="width: 100%"
+                placeholder="请选择"
+              >
+                <el-option
+                  v-for="option in optionsFor(item.key) ?? []"
+                  :key="option.value"
+                  :label="option.label"
+                  :value="option.value"
+                />
+              </el-select>
+              <el-input
+                v-else-if="isMultiline(item)"
+                v-model="draft[item.key]"
+                type="textarea"
+                :rows="3"
+                :placeholder="item.key"
+              />
+              <el-input v-else v-model="draft[item.key]" :placeholder="item.key" />
+              <p class="hint">
+                <span class="mono">{{ item.key }}</span>
+                <el-tag v-if="item.isPublic === 1" size="small" type="success" class="tag">公开</el-tag>
+                <el-tag v-else size="small" type="info" class="tag">仅后台</el-tag>
+                <span v-if="item.key === 'share.template'" class="tag">支持 {title} {url} {summary}</span>
+              </p>
+            </el-form-item>
+          </el-form>
+        </el-collapse-item>
+      </el-collapse>
     </el-card>
   </div>
 </template>
@@ -184,6 +197,26 @@ onMounted(load)
 .panel {
   border-radius: 12px;
   margin-bottom: 16px;
+}
+
+.settings-collapse {
+  border: none;
+}
+
+.settings-collapse :deep(.el-collapse-item__header) {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.settings-collapse :deep(.el-collapse-item__content) {
+  padding-bottom: 8px;
+}
+
+.panel__count {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--admin-muted);
 }
 
 .panel__title {
