@@ -58,10 +58,11 @@ watch(focusInside, (value) => {
       <span class="muted comment__time">{{ formatDateTime(comment.createTime) }}</span>
     </div>
 
-    <p class="comment__content">{{ comment.content }}</p>
+    <p v-if="comment.hidden" class="comment__hidden">当前评论已被隐藏</p>
+    <p v-else class="comment__content">{{ comment.content }}</p>
 
-    <!-- 最多四级：第 4 级不再提供回复入口；自己的评论也不显示 -->
-    <div v-if="!comment.mine && (depth ?? 0) < 3" class="comment__actions">
+    <!-- 最多四级：第 4 级不再提供回复入口；自己的评论、已隐藏的评论也不显示 -->
+    <div v-if="!comment.mine && !comment.hidden && (depth ?? 0) < 3" class="comment__actions">
       <button class="comment__reply" @click="emit('reply', comment)">回复</button>
     </div>
 
@@ -145,6 +146,13 @@ watch(focusInside, (value) => {
   color: var(--fg-soft);
   line-height: 1.7;
   white-space: pre-wrap;
+}
+
+.comment__hidden {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
 }
 
 .comment__actions {

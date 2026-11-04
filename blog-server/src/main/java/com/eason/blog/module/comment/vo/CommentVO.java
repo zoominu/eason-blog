@@ -14,5 +14,7 @@ public record CommentVO(
         LocalDateTime createTime,
         boolean mine,
         boolean author,
+        /** 被拒绝/待审核但有已通过回复：展示为「当前评论已被隐藏」占位 */
+        boolean hidden,
         List<CommentVO> replies) {
 }

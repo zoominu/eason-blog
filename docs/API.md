@@ -163,7 +163,10 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 
 - 评论**最多四级**，对第 4 级评论继续回复返回 400；
 - 管理员（SUPER_ADMIN）评论/回复免审，直接 `status=1`；
-- 审核关闭时按违禁词策略处理（见 4.7）。
+- 审核关闭时按违禁词策略处理（见 4.7）；
+- 父评论被拒绝但下面还有已通过回复时，父节点以 `hidden=true`、内容「当前评论已被隐藏」占位返回，
+  回复照常展示；删除父评论会连同其下所有回复一起删除；
+- 「评论已通过审核」通知只发第一次，之后拒绝再通过不重复通知。
 
 `/site/config` 返回键值对：`site.title`、`site.subtitle`、`site.description`、`site.author`、`site.avatar`、`site.startDate`、`site.github`、`site.icp`。
 
@@ -308,6 +311,15 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | --- | --- |
 | `GET /admin/comments` | `status`、`keyword`（内容/昵称/邮箱/文章标题）、`articleId`、`userId`、`page`、`size` |
 | `GET /admin/guestbook` | `status`、`keyword`（内容/昵称/邮箱）、`userId`、`page`、`size` |
+
+删除：
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| DELETE | `/admin/comments/{id}` | 删除评论**及其下所有回复**，返回 `{deleted}` |
+| POST | `/admin/comments/batch-delete` | `{ "ids": [...] }`，返回 `{deleted}` |
+| DELETE | `/admin/guestbook/{id}` | 删除留言 |
+| POST | `/admin/guestbook/batch-delete` | `{ "ids": [...] }`，返回 `{deleted}` |
 
 批量审核：`POST /admin/comments/batch`、`POST /admin/guestbook/batch`，
 body `{ "ids": [1,2,3], "approve": true }`，返回 `{ "updated": n }`。

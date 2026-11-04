@@ -146,11 +146,12 @@ async function loadComments(page: number) {
 }
 
 /**
- * 滚动到指定评论并短暂高亮（同一条评论只高亮一次）。
+ * 滚动到指定评论并短暂高亮。
  * 评论可能在其它分页：先找当前页，找不到就逐页找（最多 10 页）。
+ *
+ * 只靠移除 URL 参数来避免刷新重复高亮；同一次会话里再次点击通知仍然会高亮，
+ * 否则用户会觉得“跳转失效”。
  */
-const highlightedIds = new Set<number>()
-
 async function focusComment(commentId: string, options: { stripQuery?: boolean } = {}) {
   let element = document.getElementById(`comment-${commentId}`)
   let page = commentsPage.value
@@ -161,17 +162,13 @@ async function focusComment(commentId: string, options: { stripQuery?: boolean }
     element = document.getElementById(`comment-${commentId}`)
   }
   if (!element) {
-    commentHint.value = '未找到该评论，可能尚未通过审核'
+    commentHint.value = '未找到该评论，可能已被删除'
+    showToast('未找到该评论，可能已被删除', 'info')
     return
   }
   element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-
-  const numericId = Number(commentId)
-  if (!highlightedIds.has(numericId)) {
-    highlightedIds.add(numericId)
-    element.classList.add('comment--highlight')
-    setTimeout(() => element?.classList.remove('comment--highlight'), 3200)
-  }
+  element.classList.add('comment--highlight')
+  setTimeout(() => element?.classList.remove('comment--highlight'), 3200)
 
   // 高亮后把 ?comment= 从地址栏去掉：刷新页面不会再次高亮
   if (options.stripQuery && route.query.comment) {

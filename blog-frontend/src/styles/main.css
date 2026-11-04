@@ -203,6 +203,14 @@ a {
   margin: 1.2em 0;
 }
 
+/* 目录跳转时给固定导航留出空间，避免标题被挡住 */
+.prose-blog h1,
+.prose-blog h2,
+.prose-blog h3,
+.prose-blog h4 {
+  scroll-margin-top: 96px;
+}
+
 /* 代码块复制按钮（由 ArticleView 动态插入） */
 .prose-blog pre .code-copy {
   position: absolute;

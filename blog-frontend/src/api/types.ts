@@ -110,6 +110,8 @@ export interface CommentItem {
   createTime: string
   mine: boolean
   author: boolean
+  /** 被拒绝但有已通过回复：以「当前评论已被隐藏」占位展示 */
+  hidden?: boolean
   replies: CommentItem[]
 }
 

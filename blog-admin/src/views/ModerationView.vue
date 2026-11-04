@@ -77,32 +77,17 @@ function rowProps({ row }: { row: AdminComment | AdminGuestbook }) {
   return { 'data-comment-id': String(row.id) }
 }
 
-async function moderate(row: AdminComment | AdminGuestbook, approve: boolean) {
-  const label = approve ? '通过' : '拒绝'
-  await ElMessageBox.confirm(`确定${label}这条${kind.value === 'guestbook' ? '留言' : '评论'}？`, '提示')
-  try {
-    if (kind.value === 'guestbook') {
-      approve ? await moderationApi.approveGuestbook(row.id) : await moderationApi.rejectGuestbook(row.id)
-    } else {
-      approve ? await moderationApi.approveComment(row.id) : await moderationApi.rejectComment(row.id)
-    }
-    ElMessage.success(`${label}成功`)
-    await load()
-  } catch (e) {
-    ElMessage.error((e as Error).message)
-  }
-}
-
 function onSelectionChange(rows: (AdminComment | AdminGuestbook)[]) {
   selected.value = rows
 }
 
-async function batchModerate(approve: boolean) {
-  if (!selected.value.length) return
+async function actOnSelected(approve: boolean) {  if (!selected.value.length) return
+  const count = selected.value.length
   const label = approve ? '通过' : '拒绝'
+  const noun = kind.value === 'guestbook' ? '留言' : '评论'
   await ElMessageBox.confirm(
-    `确定批量${label}选中的 ${selected.value.length} 条${kind.value === 'guestbook' ? '留言' : '评论'}？`,
-    '批量操作'
+    count > 1 ? `确定批量${label}选中的 ${count} 条${noun}？` : `确定${label}选中的这条${noun}？`,
+    '提示'
   )
   try {
     const ids = selected.value.map((row) => row.id)
@@ -110,6 +95,31 @@ async function batchModerate(approve: boolean) {
       ? await moderationApi.batchGuestbook(ids, approve)
       : await moderationApi.batchComments(ids, approve)
     ElMessage.success(`已${label} ${result.updated} 条`)
+    selected.value = []
+    await load()
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  }
+}
+
+async function deleteSelected() {
+  if (!selected.value.length) return
+  const count = selected.value.length
+  const noun = kind.value === 'guestbook' ? '留言' : '评论'
+  const extra = kind.value === 'comments' ? '，评论下面的回复也会一并删除' : ''
+  await ElMessageBox.confirm(
+    count > 1
+      ? `确定批量删除 ${count} 条${noun}？${extra}，删除后不可恢复。`
+      : `确定删除这条${noun}？${extra}，删除后不可恢复。`,
+    '删除确认',
+    { type: 'warning', confirmButtonText: '删除', confirmButtonClass: 'el-button--danger' }
+  )
+  try {
+    const ids = selected.value.map((row) => row.id)
+    const result = kind.value === 'guestbook'
+      ? await moderationApi.batchDeleteGuestbook(ids)
+      : await moderationApi.batchDeleteComments(ids)
+    ElMessage.success(`已删除 ${result.deleted} 条`)
     selected.value = []
     await load()
   } catch (e) {
@@ -236,11 +246,14 @@ async function submitReply() {
         </el-select>
         <el-button @click="search">查询</el-button>
         <el-button @click="resetFilters">重置</el-button>
-        <el-button type="success" plain :disabled="!selected.length" @click="batchModerate(true)">
-          批量通过{{ selected.length ? ` (${selected.length})` : '' }}
+        <el-button type="success" plain :disabled="!selected.length" @click="actOnSelected(true)">
+          {{ selected.length > 1 ? `批量通过 (${selected.length})` : '通过' }}
         </el-button>
-        <el-button type="danger" plain :disabled="!selected.length" @click="batchModerate(false)">
-          批量拒绝{{ selected.length ? ` (${selected.length})` : '' }}
+        <el-button type="warning" plain :disabled="!selected.length" @click="actOnSelected(false)">
+          {{ selected.length > 1 ? `批量拒绝 (${selected.length})` : '拒绝' }}
+        </el-button>
+        <el-button type="danger" plain :disabled="!selected.length" @click="deleteSelected">
+          {{ selected.length > 1 ? `批量删除 (${selected.length})` : '删除' }}
         </el-button>
       </div>
 
@@ -277,18 +290,10 @@ async function submitReply() {
         <el-table-column label="时间" width="170">
           <template #default="{ row }">{{ row.createTime?.replace('T', ' ') }}</template>
         </el-table-column>
-        <el-table-column label="操作" :width="kind === 'guestbook' ? 210 : 150" fixed="right">
+        <!-- 行内只保留「回复」：通过/拒绝/删除统一走顶部按钮（按选中数量切换单条/批量） -->
+        <el-table-column v-if="kind === 'guestbook'" label="操作" width="90" fixed="right">
           <template #default="{ row }">
-            <el-button
-              v-if="kind === 'guestbook'"
-              link
-              type="primary"
-              @click="openReply(row)"
-            >
-              回复
-            </el-button>
-            <el-button link type="success" :disabled="row.status === 1" @click="moderate(row, true)">通过</el-button>
-            <el-button link type="danger" :disabled="row.status === 2" @click="moderate(row, false)">拒绝</el-button>
+            <el-button link type="primary" @click="openReply(row)">回复</el-button>
           </template>
         </el-table-column>
       </el-table>

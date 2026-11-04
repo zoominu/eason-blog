@@ -23,9 +23,12 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -196,6 +199,70 @@ class AuditPolicyTest {
         mockMvc.perform(get("/api/v1/admin/comments?articleId=" + articleId()).cookie(adminCookie))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.total").value(org.hamcrest.Matchers.greaterThanOrEqualTo(3)));
+    }
+
+    @Test
+    void rejectedParentBecomesPlaceholderAndKeepsReplies() throws Exception {
+        long root = postComment(userCookie, "占位根评论-" + UUID.randomUUID().toString().substring(0, 5), null);
+        mockMvc.perform(post("/api/v1/admin/comments/" + root + "/approve").cookie(adminCookie))
+                .andExpect(status().isOk());
+
+        long reply = postComment(adminCookie, "占位回复", root);
+        // 拒绝父评论：回复不应被拒绝
+        mockMvc.perform(post("/api/v1/admin/comments/" + root + "/reject").cookie(adminCookie))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/articles/" + slug + "/comments?size=50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[?(@.id == " + root + ")].hidden").value(true))
+                .andExpect(jsonPath("$.data.records[?(@.id == " + root + ")].content")
+                        .value("当前评论已被隐藏"))
+                .andExpect(jsonPath("$.data.records[?(@.id == " + root + ")].replies[?(@.id == "
+                        + reply + ")]").exists());
+    }
+
+    @Test
+    void deletingParentRemovesReplies() throws Exception {
+        long root = postComment(userCookie, "删除根评论-" + UUID.randomUUID().toString().substring(0, 5), null);
+        long reply = postComment(adminCookie, "删除回复", root);
+
+        mockMvc.perform(delete("/api/v1/admin/comments/" + root).cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.deleted").value(2));
+
+        mockMvc.perform(get("/api/v1/articles/" + slug + "/comments?size=50"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[?(@.id == " + root + ")]").doesNotExist())
+                .andExpect(jsonPath("$.data.records[?(@.id == " + reply + ")]").doesNotExist());
+    }
+
+    @Test
+    void approvalNotificationIsSentOnlyOnce() throws Exception {
+        long comment = postComment(userCookie, "通知只发一次-" + UUID.randomUUID().toString().substring(0, 5), null);
+
+        mockMvc.perform(post("/api/v1/admin/comments/" + comment + "/approve").cookie(adminCookie))
+                .andExpect(status().isOk());
+        int first = approvalNoticeCount(comment);
+        assertThat(first).isEqualTo(1);
+
+        mockMvc.perform(post("/api/v1/admin/comments/" + comment + "/reject").cookie(adminCookie))
+                .andExpect(status().isOk());
+        mockMvc.perform(post("/api/v1/admin/comments/" + comment + "/approve").cookie(adminCookie))
+                .andExpect(status().isOk());
+
+        assertThat(approvalNoticeCount(comment)).isEqualTo(1);
+    }
+
+    private int approvalNoticeCount(long commentId) throws Exception {
+        String body = mockMvc.perform(get("/api/v1/users/me/notifications?limit=50").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        List<Object> links = com.jayway.jsonpath.JsonPath.read(body, "$.data[*].link");
+        return (int) links.stream()
+                .filter(Objects::nonNull)
+                .map(String::valueOf)
+                .filter(link -> link.contains("?comment=" + commentId))
+                .count();
     }
 
     private long postComment(Cookie cookie, String content, Long parentId) throws Exception {

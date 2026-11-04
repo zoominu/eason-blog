@@ -111,6 +111,9 @@ export const moderationApi = {
   rejectComment: (id: number) => post<void>(`/admin/comments/${id}/reject`),
   batchComments: (ids: number[], approve: boolean) =>
     post<{ updated: number }>('/admin/comments/batch', { ids, approve }),
+  deleteComment: (id: number) => del<{ deleted: number }>(`/admin/comments/${id}`),
+  batchDeleteComments: (ids: number[]) =>
+    post<{ deleted: number }>('/admin/comments/batch-delete', { ids }),
 
   guestbook: (params: { status?: number; keyword?: string; userId?: number; page?: number; size?: number }) =>
     get<PageResult<AdminGuestbook>>('/admin/guestbook', { ...params }),
@@ -118,6 +121,9 @@ export const moderationApi = {
   rejectGuestbook: (id: number) => post<void>(`/admin/guestbook/${id}/reject`),
   batchGuestbook: (ids: number[], approve: boolean) =>
     post<{ updated: number }>('/admin/guestbook/batch', { ids, approve }),
+  deleteGuestbook: (id: number) => del<{ deleted: number }>(`/admin/guestbook/${id}`),
+  batchDeleteGuestbook: (ids: number[]) =>
+    post<{ deleted: number }>('/admin/guestbook/batch-delete', { ids }),
   replyGuestbook: (id: number, reply: string) =>
     instance.patch(`/api/v1/admin/guestbook/${id}/reply`, { reply }).then(() => undefined)
 }

@@ -10,6 +10,7 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -120,5 +121,34 @@ public class AdminModerationController {
                                             @RequestBody Map<String, String> body) {
         interactionService.replyGuestbook(id, body.get("reply"));
         return ApiResponse.success();
+    }
+
+    /** 删除评论（连同其下回复） */
+    @DeleteMapping("/comments/{id}")
+    @Audit(module = "comment", action = "删除评论")
+    public ApiResponse<Map<String, Integer>> deleteComment(@PathVariable Long id) {
+        return ApiResponse.success(Map.of("deleted", interactionService.deleteComment(id)));
+    }
+
+    /** 批量删除评论：body { "ids": [1,2,3] } */
+    @PostMapping("/comments/batch-delete")
+    @Audit(module = "comment", action = "批量删除评论")
+    public ApiResponse<Map<String, Integer>> batchDeleteComments(@RequestBody Map<String, Object> body) {
+        return ApiResponse.success(Map.of("deleted", interactionService.batchDeleteComments(idsOf(body))));
+    }
+
+    /** 删除留言 */
+    @DeleteMapping("/guestbook/{id}")
+    @Audit(module = "guestbook", action = "删除留言")
+    public ApiResponse<Void> deleteGuestbook(@PathVariable Long id) {
+        interactionService.deleteGuestbook(id);
+        return ApiResponse.success();
+    }
+
+    /** 批量删除留言：body { "ids": [1,2,3] } */
+    @PostMapping("/guestbook/batch-delete")
+    @Audit(module = "guestbook", action = "批量删除留言")
+    public ApiResponse<Map<String, Integer>> batchDeleteGuestbook(@RequestBody Map<String, Object> body) {
+        return ApiResponse.success(Map.of("deleted", interactionService.batchDeleteGuestbook(idsOf(body))));
     }
 }

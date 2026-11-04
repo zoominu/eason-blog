@@ -108,6 +108,9 @@ public class InteractionService {
      * <p>按“顶层评论”分页，每条顶层评论连同其全部回复一起返回：
      * 如果按记录数分页，会把一条对话拆到两页，阅读体验很差。
      * 数据量是单篇文章级别，内存分页足够。</p>
+     *
+     * <p>可见性：已通过的评论正常展示；被拒绝/待审核但下面还有已通过回复的评论，
+     * 以「当前评论已被隐藏」占位保留，避免回复凭空消失。</p>
      */
     public PageResult<CommentVO> comments(String slug, Long currentUserId, int pageNo, int size) {
         Article article = requirePublicArticleBySlug(slug);
@@ -116,9 +119,29 @@ public class InteractionService {
 
         List<Comment> all = commentMapper.selectList(Wrappers.<Comment>lambdaQuery()
                 .eq(Comment::getArticleId, article.getId())
-                .eq(Comment::getStatus, APPROVED)
                 .orderByAsc(Comment::getCreateTime));
         if (all.isEmpty()) {
+            return PageResult.empty(page, pageSize);
+        }
+
+        Map<Long, Comment> byId = all.stream()
+                .collect(Collectors.toMap(Comment::getId, Function.identity()));
+        Map<Long, List<Comment>> byParent = all.stream()
+                .collect(Collectors.groupingBy(c -> c.getParentId() == null ? 0L : c.getParentId()));
+
+        // 已通过的节点 + 它们的祖先链可见；其余节点不展示
+        Set<Long> visible = new HashSet<>();
+        for (Comment c : all) {
+            if (c.getStatus() != null && c.getStatus() == APPROVED) {
+                Long cursor = c.getId();
+                int guard = 0;
+                while (cursor != null && cursor > 0 && visible.add(cursor) && guard++ < 50) {
+                    Comment node = byId.get(cursor);
+                    cursor = node == null ? null : node.getParentId();
+                }
+            }
+        }
+        if (visible.isEmpty()) {
             return PageResult.empty(page, pageSize);
         }
 
@@ -126,20 +149,18 @@ public class InteractionService {
                         all.stream().map(Comment::getUserId).filter(Objects::nonNull).collect(Collectors.toSet()))
                 .stream().collect(Collectors.toMap(User::getId, Function.identity()));
 
-        Map<Long, List<Comment>> byParent = all.stream()
-                .collect(Collectors.groupingBy(c -> c.getParentId() == null ? 0L : c.getParentId()));
-
-        // 博主评论打标：一次查出所有管理员 id
         Set<Long> authorIds = new HashSet<>(userRoleMapper.selectUserIdsByRoleCode("SUPER_ADMIN"));
 
-        List<Comment> roots = byParent.getOrDefault(0L, List.of());
+        List<Comment> roots = byParent.getOrDefault(0L, List.of()).stream()
+                .filter(c -> visible.contains(c.getId()))
+                .toList();
         int total = roots.size();
         int from = Math.min((page - 1) * pageSize, total);
         int to = Math.min(from + pageSize, total);
 
         List<CommentVO> records = new ArrayList<>(to - from);
         for (Comment root : roots.subList(from, to)) {
-            records.add(toVO(root, byParent, users, currentUserId, authorIds));
+            records.add(toVO(root, byParent, users, currentUserId, authorIds, visible));
         }
 
         long pages = pageSize == 0 ? 0 : (total + pageSize - 1) / pageSize;
@@ -147,20 +168,24 @@ public class InteractionService {
     }
 
     private CommentVO toVO(Comment c, Map<Long, List<Comment>> byParent,
-                           Map<Long, User> users, Long currentUserId, Set<Long> authorIds) {
+                           Map<Long, User> users, Long currentUserId,
+                           Set<Long> authorIds, Set<Long> visible) {
         User user = users.get(c.getUserId());
+        boolean hidden = c.getStatus() == null || c.getStatus() != APPROVED;
         return new CommentVO(
                 c.getId(),
                 c.getUserId(),
                 user == null ? "已注销用户" : user.getNickname(),
                 user == null ? null : user.getAvatar(),
-                c.getContent(),
+                hidden ? "当前评论已被隐藏" : c.getContent(),
                 c.getParentId(),
                 c.getCreateTime(),
                 currentUserId != null && currentUserId.equals(c.getUserId()),
                 authorIds.contains(c.getUserId()),
+                hidden,
                 byParent.getOrDefault(c.getId(), List.of()).stream()
-                        .map(child -> toVO(child, byParent, users, currentUserId, authorIds))
+                        .filter(child -> visible.contains(child.getId()))
+                        .map(child -> toVO(child, byParent, users, currentUserId, authorIds, visible))
                         .toList());
     }
 
@@ -542,9 +567,16 @@ public class InteractionService {
         Article article = articleMapper.selectById(comment.getArticleId());
         String title = article == null ? titleOf(comment.getArticleId()) : article.getTitle();
         String slug = article == null ? "" : article.getSlug();
+        String link = "/article/" + slug + "?comment=" + comment.getId();
+        // 只在第一次通过时通知：拒绝后再通过不重复打扰
+        Long exists = notificationMapper.selectCount(Wrappers.<Notification>lambdaQuery()
+                .eq(Notification::getUserId, comment.getUserId())
+                .eq(Notification::getLink, link));
+        if (exists != null && exists > 0) {
+            return;
+        }
         notify(comment.getUserId(), "SYSTEM", "评论已通过审核",
-                "你在《" + title + "》下的评论「" + excerpt(comment.getContent()) + "」已展示",
-                "/article/" + slug + "?comment=" + comment.getId());
+                "你在《" + title + "》下的评论「" + excerpt(comment.getContent()) + "」已展示", link);
     }
 
     /** 批量审核评论，返回实际处理条数（已是目标状态的跳过）。 */
@@ -576,6 +608,88 @@ public class InteractionService {
             changed++;
         }
         return changed;
+    }
+
+    /**
+     * 删除评论：连同其下所有回复一起逻辑删除。
+     *
+     * <p>只减少「已通过」的计数，避免把待审核评论也算进文章评论数。</p>
+     */
+    @Transactional
+    public int deleteComment(Long id) {
+        Comment root = commentMapper.selectById(id);
+        if (root == null) {
+            throw BusinessException.notFound("评论不存在");
+        }
+
+        List<Long> ids = new ArrayList<>();
+        ids.add(id);
+        List<Long> frontier = List.of(id);
+        while (!frontier.isEmpty() && ids.size() < 5000) {
+            List<Comment> children = commentMapper.selectList(Wrappers.<Comment>lambdaQuery()
+                    .in(Comment::getParentId, frontier));
+            if (children.isEmpty()) {
+                break;
+            }
+            frontier = children.stream().map(Comment::getId).toList();
+            ids.addAll(frontier);
+        }
+
+        Long approved = commentMapper.selectCount(Wrappers.<Comment>lambdaQuery()
+                .in(Comment::getId, ids)
+                .eq(Comment::getStatus, APPROVED));
+        for (Long commentId : ids) {
+            commentMapper.deleteById(commentId);
+        }
+        if (approved != null && approved > 0) {
+            articleMapper.updateCommentCount(root.getArticleId(), -approved.intValue());
+        }
+        return ids.size();
+    }
+
+    /** 批量删除评论，返回实际删除的评论+回复总数。 */
+    @Transactional
+    public int batchDeleteComments(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        int deleted = 0;
+        for (Long id : ids.stream().filter(Objects::nonNull).distinct().toList()) {
+            try {
+                deleted += deleteComment(id);
+            } catch (BusinessException ignored) {
+                // 已被删除的跳过
+            }
+        }
+        return deleted;
+    }
+
+    /** 删除单条留言。 */
+    @Transactional
+    public void deleteGuestbook(Long id) {
+        Guestbook guestbook = guestbookMapper.selectById(id);
+        if (guestbook == null) {
+            throw BusinessException.notFound("留言不存在");
+        }
+        guestbookMapper.deleteById(id);
+    }
+
+    /** 批量删除留言。 */
+    @Transactional
+    public int batchDeleteGuestbook(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        int deleted = 0;
+        for (Long id : ids.stream().filter(Objects::nonNull).distinct().toList()) {
+            Guestbook guestbook = guestbookMapper.selectById(id);
+            if (guestbook == null) {
+                continue;
+            }
+            guestbookMapper.deleteById(id);
+            deleted++;
+        }
+        return deleted;
     }
 
     /** 后台留言列表：支持状态、用户、关键字（内容/昵称/邮箱）筛选。 */
