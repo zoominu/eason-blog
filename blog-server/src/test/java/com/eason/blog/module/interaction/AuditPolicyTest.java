@@ -277,6 +277,31 @@ class AuditPolicyTest {
     }
 
     @Test
+    void importMarkdownRewritesEmbeddedAndRelativeImages() throws Exception {
+        byte[] png = new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3};
+        String base64 = java.util.Base64.getEncoder().encodeToString(png);
+        String md = "---\ntitle: 导入测试\nslug: import-test\nsummary: 摘要\n---\n\n"
+                + "![内嵌](data:image/png;base64," + base64 + ")\n\n"
+                + "![相对](./pics/a.png)\n\n"
+                + "![缺失](./pics/missing.png)\n";
+        MockMultipartFile mdFile = new MockMultipartFile("file", "post.md", "text/markdown",
+                md.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        MockMultipartFile image = new MockMultipartFile("images", "a.png", "image/png", png);
+
+        mockMvc.perform(multipart("/api/v1/admin/articles/import-markdown")
+                        .file(mdFile).file(image).cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.title").value("导入测试"))
+                .andExpect(jsonPath("$.data.slug").value("import-test"))
+                .andExpect(jsonPath("$.data.content")
+                        .value(org.hamcrest.Matchers.containsString("/uploads/markdown/")))
+                .andExpect(jsonPath("$.data.images.length()").value(2))
+                .andExpect(jsonPath("$.data.warnings.length()").value(1))
+                .andExpect(jsonPath("$.data.warnings[0]")
+                        .value(org.hamcrest.Matchers.containsString("missing.png")));
+    }
+
+    @Test
     void commentCannotBeDeletedAfterThreeMinutes() throws Exception {
         long id = postComment(userCookie, "超时评论-" + UUID.randomUUID().toString().substring(0, 5), null);
         Comment stored = commentMapper.selectById(id);

@@ -122,6 +122,50 @@ async function back() {
   await router.push('/articles')
 }
 
+// ---------------- 导入 Markdown（含随文图片） ----------------
+const mdInput = ref<HTMLInputElement | null>(null)
+const importing = ref(false)
+
+async function onMarkdownImport(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  const md = files.find((f) => /\.(md|markdown)$/i.test(f.name))
+  if (!md) {
+    ElMessage.warning('请选择一个 .md 文件（可同时选中图片）')
+    return
+  }
+  if (form.content.trim()) {
+    try {
+      await ElMessageBox.confirm('导入会覆盖当前正文，确定继续？', '导入 Markdown')
+    } catch {
+      return
+    }
+  }
+
+  const data = new FormData()
+  data.append('file', md)
+  files.filter((f) => f !== md).forEach((f) => data.append('images', f))
+
+  importing.value = true
+  try {
+    const result = await articleApi.importMarkdown(data)
+    if (result.title) form.title = result.title
+    if (result.slug) form.slug = result.slug
+    if (result.summary) form.summary = result.summary
+    if (result.cover) form.cover = result.cover
+    if (result.content) form.content = result.content
+    ElMessage.success(`已导入 Markdown，图片 ${result.images.length} 张`)
+    if (result.warnings?.length) {
+      ElMessage.warning(result.warnings.join('；'))
+    }
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    importing.value = false
+  }
+}
+
 onMounted(async () => {
   try {
     const [cats, tagList] = await Promise.all([categoryApi.list(), tagApi.list()])
@@ -154,6 +198,15 @@ watch(
         </div>
       </div>
       <div class="head-actions">
+        <el-button :loading="importing" @click="mdInput?.click()">导入 MD</el-button>
+        <input
+          ref="mdInput"
+          type="file"
+          class="md-input"
+          accept=".md,.markdown,image/*"
+          multiple
+          @change="onMarkdownImport"
+        />
         <el-button :loading="saving" :icon="Check" @click="save(false)">保存草稿</el-button>
         <el-button type="primary" :loading="saving" :icon="Promotion" @click="save(true)">保存并发布</el-button>
       </div>
@@ -173,6 +226,9 @@ watch(
 
           <el-form-item label="正文" required>
             <MarkdownEditor v-model="form.content" />
+            <p class="hint">
+              支持「导入 MD」：选择 .md 时可一并选中其中的图片，导入后图片会自动上传并改写引用。
+            </p>
           </el-form-item>
         </el-form>
       </el-card>
@@ -245,6 +301,10 @@ watch(
 </template>
 
 <style scoped>
+.md-input {
+  display: none;
+}
+
 .head-left {
   display: flex;
   align-items: flex-start;

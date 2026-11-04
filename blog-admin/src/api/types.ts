@@ -230,3 +230,14 @@ export interface Column {
   articleCount: number
   sort?: number
 }
+
+/** 导入 Markdown 的解析结果 */
+export interface MarkdownImportResult {
+  title: string
+  slug: string
+  summary: string
+  cover: string
+  content: string
+  images: { name: string; url: string }[]
+  warnings: string[]
+}

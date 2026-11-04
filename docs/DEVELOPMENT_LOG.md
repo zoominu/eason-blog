@@ -4,6 +4,23 @@
 
 ---
 
+## 2026-11-04 · 文章导入 Markdown（含图片）
+
+| 需求 | 处理 |
+| --- | --- |
+| 新建文章可直接上传 md，图片一起上传并解析展示 | 新增 `POST /admin/articles/import-markdown`（multipart：md + 多张图片）。服务端解析 front matter / 首个 H1 作为标题，把 base64 内嵌图片解码保存，把相对路径图片按文件名匹配本次上传的文件，统一改写成 `/uploads/markdown/yyyy/MM/xxx` 后返回 Markdown；后台「新建文章」加「导入 MD」按钮，选中 md + 图片后自动填标题/摘要/正文，保存发布后前台直接显示 |
+
+### 验证
+
+```
+后端测试  Tests run: 57（新增导入解析用例：front matter、base64、相对路径、缺失图片告警）
+浏览器    scripts/verify-markdown-import.mjs 9/9
+```
+
+实测导入后正文含两个 `/uploads/markdown/...` 地址，发布后前台 `img` 数量 2、`naturalWidth > 0`。
+
+---
+
 ## 2026-11-04 · 个人中心与评论自助管理
 
 | # | 需求 | 处理 |

@@ -339,6 +339,15 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 
 评论删除规则：仅本人、创建 3 分钟内、没有回复；管理员删除不受此限制（会级联删除回复）。
 
+| POST | `/admin/articles/import-markdown` | multipart：`file`（.md）+ 可选多个 `images`；返回解析后的标题/正文/图片列表，图片已上传并改写引用 |
+
+导入规则：
+
+- 支持 YAML front matter（`title` / `slug` / `summary` / `cover`），没有 title 时取正文第一个 `# 标题`，并把该行从正文移除；
+- 正文中的 base64 内嵌图片（`data:image/...;base64,...`）会解码保存；
+- 正文里的相对图片路径按**文件名**匹配本次一起上传的图片，找不到会在 `warnings` 里列出；
+- 图片存入 `uploads/markdown/yyyy/MM/`，单张 ≤5MB，一次最多 30 张；返回的 `content` 已替换为 `/uploads/...` 地址。
+
 批量审核：`POST /admin/comments/batch`、`POST /admin/guestbook/batch`，
 body `{ "ids": [1,2,3], "approve": true }`，返回 `{ "updated": n }`。
 

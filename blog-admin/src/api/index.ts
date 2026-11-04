@@ -10,6 +10,7 @@ import type {
   Category,
   Column,
   DashboardData,
+  MarkdownImportResult,
   PageResult,
   PermissionItem,
   ResourceItem,
@@ -45,7 +46,9 @@ export const articleApi = {
   publish: (id: number) => post<void>(`/admin/articles/${id}/publish`),
   offline: (id: number) => post<void>(`/admin/articles/${id}/offline`),
   restore: (id: number) => post<void>(`/admin/articles/${id}/restore`),
-  remove: (id: number) => del<void>(`/admin/articles/${id}`)
+  remove: (id: number) => del<void>(`/admin/articles/${id}`),
+  importMarkdown: (form: FormData) =>
+    post<MarkdownImportResult>('/admin/articles/import-markdown', form)
 }
 
 export const categoryApi = {

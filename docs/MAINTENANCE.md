@@ -79,7 +79,7 @@ node scripts/seed-vm-demo.mjs http://192.168.245.131
 | 路径 | 内容 | 属主 |
 | --- | --- | --- |
 | `/opt/eason-blog/app/blog-server.jar` | 后端可执行 jar | eason |
-| `/opt/eason-blog/data/uploads/` | 用户上传文件（按 `yyyy/MM` 分目录） | eason |
+| `/opt/eason-blog/data/uploads/` | 用户上传文件（按 `yyyy/MM` 分目录）；另有 `avatar/`（头像）与 `markdown/`（导入 Markdown 的随文图片） | eason |
 | `/var/www/eason-blog/` | 前台构建产物（index.html、assets/） | www-data |
 | `/var/www/eason-blog/admin/` | 后台构建产物 | www-data |
 | `/etc/eason-blog.env` | 全部运行参数与密钥（**600**） | root |

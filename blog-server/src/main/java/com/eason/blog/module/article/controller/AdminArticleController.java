@@ -39,9 +39,12 @@ import java.util.Map;
 public class AdminArticleController {
 
     private final AdminArticleService adminArticleService;
+    private final com.eason.blog.module.article.service.MarkdownImportService markdownImportService;
 
-    public AdminArticleController(AdminArticleService adminArticleService) {
+    public AdminArticleController(AdminArticleService adminArticleService,
+                                  com.eason.blog.module.article.service.MarkdownImportService markdownImportService) {
         this.adminArticleService = adminArticleService;
+        this.markdownImportService = markdownImportService;
     }
 
     @GetMapping
@@ -75,8 +78,17 @@ public class AdminArticleController {
         return ApiResponse.success();
     }
 
-    @PostMapping("/{id}/publish")
-    @Audit(module = "article", action = "发布文章")
+    /** 导入 Markdown：解析标题/正文，随文图片一并上传并改写引用 */
+    @PostMapping(value = "/import-markdown", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Audit(module = "article", action = "导入 Markdown")
+    public ApiResponse<com.eason.blog.module.article.service.MarkdownImportService.ImportResult> importMarkdown(
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "images", required = false)
+            java.util.List<org.springframework.web.multipart.MultipartFile> images) {
+        return ApiResponse.success(markdownImportService.importMarkdown(file, images));
+    }
+
+    @PostMapping("/{id}/publish")    @Audit(module = "article", action = "发布文章")
     public ApiResponse<Void> publish(@PathVariable Long id) {
         adminArticleService.publish(id);
         return ApiResponse.success();
