@@ -4,6 +4,24 @@
 
 ---
 
+## 2026-11-04 · 部署到 VPS（雷池源站 8080）
+
+| 项 | 内容 |
+| --- | --- |
+| 机器 | 39.96.94.89，Debian 12，2C/1.6G，已有雷池 WAF 9.4.3（Docker，管理端 9443） |
+| 方案 | 本机 Nginx 监听 `127.0.0.1:8080`（静态 + /api 反代），后端 `127.0.0.1:8081`，MySQL 仅本机；雷池 80/443 反代到 8080（tengine 为 host 网络，可访问回环） |
+| 内存 | 新增 2G swap；JVM `-Xmx256m`、MySQL buffer 96M、关闭 performance_schema |
+| 账号 | `admin@eason.blog` / `Admin123456`（需尽快修改） |
+| 自动化 | `scripts/deploy-vps.ps1`：打包 jar + 两个 dist，上传并重启，自动等待接口 200 |
+| 备份 | `/usr/local/bin/eason-blog-backup.sh` + cron 每天 03:20，保留 14 天 |
+
+### 验证
+
+`curl 127.0.0.1:8080/`、`/api/v1/articles`、`/admin/` 均 200；管理员登录 200；资源上传与 `/uploads/` 静态访问 200；
+Flyway 7 个迁移成功；无 OOM。详见 `docs/VPS_DEPLOY.md`。
+
+---
+
 ## 2026-11-04 · 去回收站、用户头像、资源分类与引用、首页缩略图
 
 | # | 需求 | 处理 |
