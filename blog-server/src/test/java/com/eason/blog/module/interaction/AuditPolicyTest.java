@@ -277,6 +277,46 @@ class AuditPolicyTest {
     }
 
     @Test
+    void deletingArticleRemovesItCompletely() throws Exception {
+        mockMvc.perform(delete("/api/v1/admin/articles/" + articleId()).cookie(adminCookie))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/articles/" + slug))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/v1/admin/articles?keyword=" + slug).cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records.length()").value(0));
+    }
+
+    @Test
+    void resourceIsTypedAndListsReferencingArticles() throws Exception {
+        byte[] png = new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3};
+        MockMultipartFile image = new MockMultipartFile("file", "cover.png", "image/png", png);
+        String body = mockMvc.perform(multipart("/api/v1/admin/resources/upload").file(image).cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.type").value("article_image"))
+                .andReturn().getResponse().getContentAsString();
+        Number resourceId = com.jayway.jsonpath.JsonPath.read(body, "$.data.id");
+        String url = com.jayway.jsonpath.JsonPath.read(body, "$.data.url");
+
+        mockMvc.perform(get("/api/v1/admin/resources/" + resourceId.longValue() + "/references")
+                        .cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        Article article = articleMapper.selectById(articleId());
+        article.setContent("![封面](" + url + ")");
+        articleMapper.updateById(article);
+
+        mockMvc.perform(get("/api/v1/admin/resources/" + resourceId.longValue() + "/references")
+                        .cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value(articleId()));
+    }
+
+    @Test
     void importMarkdownRewritesEmbeddedAndRelativeImages() throws Exception {
         byte[] png = new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3};
         String base64 = java.util.Base64.getEncoder().encodeToString(png);
@@ -375,7 +415,12 @@ class AuditPolicyTest {
                 new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3});
         mockMvc.perform(multipart("/api/v1/users/me/avatar").file(file).cookie(userCookie))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.url").value(org.hamcrest.Matchers.startsWith("/uploads/avatar/")));
+                .andExpect(jsonPath("$.data.url").value(org.hamcrest.Matchers.startsWith("/uploads/")));
+
+        // 头像也登记进资源库，类型为 avatar
+        mockMvc.perform(get("/api/v1/admin/resources?type=avatar&size=20").cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].type").value("avatar"));
     }
 
     private int approvalNoticeCount(long commentId) throws Exception {

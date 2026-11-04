@@ -52,15 +52,18 @@ function search() {
   load()
 }
 
-async function changeStatus(row: AdminArticleListItem, action: 'publish' | 'offline' | 'restore' | 'delete') {
-  const label = { publish: '发布', offline: '下线', restore: '恢复', delete: '移入回收站' }[action]
+async function changeStatus(row: AdminArticleListItem, action: 'publish' | 'offline' | 'delete') {
+  const label = { publish: '发布', offline: '下线', delete: '删除' }[action]
   if (action === 'delete') {
-    await ElMessageBox.confirm(`确定把《${row.title}》移入回收站？`, '提示', { type: 'warning' })
+    await ElMessageBox.confirm(
+      `确定删除《${row.title}》？删除后不可恢复。如果只是不想让访客看到，请用「下线」。`,
+      '删除确认',
+      { type: 'warning', confirmButtonText: '删除', confirmButtonClass: 'el-button--danger' }
+    )
   }
   try {
     if (action === 'publish') await articleApi.publish(row.id)
     if (action === 'offline') await articleApi.offline(row.id)
-    if (action === 'restore') await articleApi.restore(row.id)
     if (action === 'delete') await articleApi.remove(row.id)
     ElMessage.success(`${label}成功`)
     load()
@@ -104,7 +107,7 @@ watch(
     <header class="page__head">
       <div>
         <h2 class="page__title">文章管理</h2>
-        <p class="page__desc">共 {{ total }} 篇 · 草稿与回收站中的文章不会出现在前台</p>
+        <p class="page__desc">共 {{ total }} 篇 · 草稿与已下线的文章不会出现在前台，删除后不可恢复</p>
       </div>
       <el-button type="primary" @click="router.push('/articles/create')">新建文章</el-button>
     </header>
@@ -123,7 +126,6 @@ watch(
           <el-option label="草稿" :value="0" />
           <el-option label="已发布" :value="1" />
           <el-option label="已下线" :value="2" />
-          <el-option label="回收站" :value="3" />
         </el-select>
         <el-select v-model="query.categoryId" placeholder="全部分类" clearable style="width: 160px" @change="search">
           <el-option v-for="c in categories" :key="c.id" :label="c.name" :value="c.id" />
@@ -169,7 +171,7 @@ watch(
           <template #default="{ row }">
             <el-button link type="primary" @click="router.push(`/articles/${row.id}/edit`)">编辑</el-button>
             <el-button
-              v-if="row.status !== 1 && row.status !== 3"
+              v-if="row.status !== 1"
               link
               type="success"
               @click="changeStatus(row, 'publish')"
@@ -179,11 +181,8 @@ watch(
             <el-button v-if="row.status === 1" link type="warning" @click="changeStatus(row, 'offline')">
               下线
             </el-button>
-            <el-button v-if="row.status === 3" link type="success" @click="changeStatus(row, 'restore')">
-              恢复
-            </el-button>
-            <el-button v-if="row.status !== 3" link type="danger" @click="changeStatus(row, 'delete')">
-              回收
+            <el-button link type="danger" @click="changeStatus(row, 'delete')">
+              删除
             </el-button>
           </template>
         </el-table-column>

@@ -95,22 +95,17 @@ class AdminArticleApiTest {
     }
 
     @Test
-    void deleteMovesToRecycleBinAndRestoreBringsBack() throws Exception {
-        String slug = "p2-recycle-" + UUID.randomUUID().toString().substring(0, 6);
+    void deleteRemovesArticleCompletely() throws Exception {
+        String slug = "p2-delete-" + UUID.randomUUID().toString().substring(0, 6);
         long id = createArticle(slug, 1).path("id").asLong();
 
         mockMvc.perform(delete("/api/v1/admin/articles/" + id).cookie(adminCookie))
                 .andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/articles/" + slug)).andExpect(status().isNotFound());
 
-        mockMvc.perform(post("/api/v1/admin/articles/" + id + "/restore").cookie(adminCookie))
-                .andExpect(status().isOk());
-
-        // 恢复后回到草稿，仍然不可见；再次发布才可见
+        // 不再有回收站：前台和后台列表都不再出现
         mockMvc.perform(get("/api/v1/articles/" + slug)).andExpect(status().isNotFound());
-        mockMvc.perform(post("/api/v1/admin/articles/" + id + "/publish").cookie(adminCookie))
-                .andExpect(status().isOk());
-        mockMvc.perform(get("/api/v1/articles/" + slug)).andExpect(status().isOk());
+        mockMvc.perform(get("/api/v1/admin/articles/" + id).cookie(adminCookie))
+                .andExpect(status().isNotFound());
     }
 
     @Test

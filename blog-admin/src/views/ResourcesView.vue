@@ -3,7 +3,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import { resourceApi } from '@/api'
-import type { ResourceItem } from '@/api/types'
+import type { ResourceItem, ResourceRef } from '@/api/types'
 import { formatDateTime } from '@/utils/format'
 
 const list = ref<ResourceItem[]>([])
@@ -11,7 +11,39 @@ const total = ref(0)
 const loading = ref(false)
 const uploading = ref(false)
 
-const query = reactive({ page: 1, size: 12, keyword: '' })
+const query = reactive({ page: 1, size: 12, keyword: '', type: '' })
+
+const TYPE_META: Record<string, { label: string; tag: 'success' | 'info' | 'warning' | 'danger' | 'primary' }> = {
+  avatar: { label: '头像', tag: 'success' },
+  article_image: { label: '文章图片', tag: 'primary' },
+  music: { label: '音乐', tag: 'warning' },
+  video: { label: '视频', tag: 'danger' },
+  document: { label: '文档', tag: 'info' },
+  other: { label: '其他', tag: 'info' }
+}
+
+const refVisible = ref(false)
+const refLoading = ref(false)
+const refTitle = ref('')
+const refs = ref<ResourceRef[]>([])
+
+async function openRefs(item: ResourceItem) {
+  refTitle.value = item.originalName
+  refVisible.value = true
+  refLoading.value = true
+  refs.value = []
+  try {
+    refs.value = await resourceApi.references(item.id)
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    refLoading.value = false
+  }
+}
+
+function statusText(status: number) {
+  return { 0: '草稿', 1: '已发布', 2: '已下线' }[status] ?? '未知'
+}
 
 function sizeText(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -102,7 +134,7 @@ onMounted(load)
     <header class="page__head">
       <div>
         <h2 class="page__title">资源管理</h2>
-        <p class="page__desc">支持图片 / PDF / 文本 / zip，单文件 ≤ 5MB；被文章引用的资源不能删除</p>
+        <p class="page__desc">支持图片 / 音视频 / PDF / 文本 / zip，单文件 ≤ 20MB；被文章引用的资源不能删除</p>
       </div>
       <el-upload :show-file-list="false" :http-request="onUpload" :disabled="uploading">
         <el-button type="primary" :loading="uploading">上传文件</el-button>
@@ -120,6 +152,9 @@ onMounted(load)
           @clear="load"
         />
         <el-button @click="load">查询</el-button>
+        <el-select v-model="query.type" placeholder="全部类型" clearable style="width: 140px" @change="() => { query.page = 1; load() }">
+          <el-option v-for="(meta, key) in TYPE_META" :key="key" :label="meta.label" :value="key" />
+        </el-select>
         <span class="muted total">共 {{ total }} 个文件</span>
       </div>
 
@@ -135,10 +170,18 @@ onMounted(load)
           </div>
           <div class="meta">
             <span class="meta__name" :title="item.originalName">{{ item.originalName }}</span>
-            <span class="muted">{{ sizeText(item.size) }} · {{ formatDateTime(item.createTime) }}</span>
+            <span class="muted">
+              <el-tag size="small" :type="TYPE_META[item.type]?.tag ?? 'info'" class="type-tag">
+                {{ TYPE_META[item.type]?.label ?? item.type }}
+              </el-tag>
+              {{ sizeText(item.size) }} · {{ formatDateTime(item.createTime) }}
+            </span>
           </div>
           <div class="ops">
             <el-button link type="primary" @click="copyUrl(item)">复制链接</el-button>
+            <el-button link type="info" @click="openRefs(item)">
+              引用{{ item.articleCount ? ` (${item.articleCount})` : '' }}
+            </el-button>
             <el-button link type="danger" @click="remove(item)">删除</el-button>
           </div>
         </div>
@@ -156,6 +199,20 @@ onMounted(load)
         />
       </div>
     </el-card>
+
+    <el-dialog v-model="refVisible" :title="`引用：${refTitle}`" width="560px">
+      <div v-loading="refLoading">
+        <p v-if="!refLoading && !refs.length" class="muted">还没有文章引用这个资源。</p>
+        <ul v-else class="refs">
+          <li v-for="item in refs" :key="item.id" class="refs__item">
+            <RouterLink :to="`/articles/${item.id}/edit`" class="refs__link">{{ item.title }}</RouterLink>
+            <el-tag size="small" :type="item.status === 1 ? 'success' : 'info'">
+              {{ statusText(item.status) }}
+            </el-tag>
+          </li>
+        </ul>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -174,6 +231,38 @@ onMounted(load)
 .total {
   font-size: 12px;
   margin-left: auto;
+}
+
+.type-tag {
+  margin-right: 6px;
+}
+
+.refs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.refs__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+}
+
+.refs__link {
+  color: var(--admin-text);
+  text-decoration: none;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .grid {

@@ -33,16 +33,25 @@ public class AdminResourceController {
 
     @PostMapping("/upload")
     public ApiResponse<ResourceVO> upload(@AuthenticationPrincipal UserPrincipal principal,
-                                          @RequestPart("file") MultipartFile file) {
-        return ApiResponse.success(resourceService.upload(file, principal.getId()));
+                                          @RequestPart("file") MultipartFile file,
+                                          @RequestParam(value = "type", required = false) String type) {
+        return ApiResponse.success(resourceService.upload(file, principal.getId(), type));
     }
 
     @GetMapping
     public ApiResponse<PageResult<ResourceVO>> list(
             @RequestParam(required = false) @Size(max = 100) String keyword,
+            @RequestParam(required = false) @Size(max = 20) String type,
             @RequestParam(defaultValue = "1") @Min(1) int page,
             @RequestParam(defaultValue = "12") @Min(1) @Max(100) int size) {
-        return ApiResponse.success(resourceService.page(keyword, page, size));
+        return ApiResponse.success(resourceService.page(keyword, type, page, size));
+    }
+
+    /** 资源被哪些文章引用 */
+    @GetMapping("/{id}/references")
+    public ApiResponse<java.util.List<com.eason.blog.module.resource.vo.ResourceRefVO>> references(
+            @PathVariable Long id) {
+        return ApiResponse.success(resourceService.references(id));
     }
 
     @DeleteMapping("/{id}")

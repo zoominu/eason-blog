@@ -205,11 +205,16 @@ onMounted(async () => {
       </div>
 
       <el-table v-loading="loading" :data="list" row-key="id">
-        <el-table-column label="用户" min-width="200">
+        <el-table-column label="用户" min-width="220">
           <template #default="{ row }">
             <div class="user">
-              <span class="user__name">{{ row.nickname }}</span>
-              <span class="muted">{{ row.email }}</span>
+              <el-avatar :size="32" :src="row.avatar || undefined" class="user__avatar">
+                {{ (row.nickname || '?').slice(0, 1) }}
+              </el-avatar>
+              <div class="user__text">
+                <span class="user__name">{{ row.nickname }}</span>
+                <span class="muted">{{ row.email }}</span>
+              </div>
             </div>
           </template>
         </el-table-column>
@@ -341,11 +346,28 @@ onMounted(async () => {
 
 .user {
   display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.user__avatar {
+  flex-shrink: 0;
+  background: var(--admin-bg, #f2f3f5);
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+
+.user__text {
+  display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .user__name {
   font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .muted {

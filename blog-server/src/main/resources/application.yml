@@ -17,9 +17,9 @@ spring:
       enabled: false
   servlet:
     multipart:
-      # 与 ResourceService 的 5MB 校验保持一致
-      max-file-size: 5MB
-      max-request-size: 6MB
+      # 与 ResourceService 的 20MB 校验、Nginx client_max_body_size 20m 保持一致
+      max-file-size: 20MB
+      max-request-size: 25MB
   datasource:
     url: jdbc:mysql://${DB_HOST:127.0.0.1}:${DB_PORT:3306}/${DB_NAME:eason_blog}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: ${DB_USER:blog}

@@ -150,7 +150,7 @@ public class ArticleServiceImpl implements ArticleService {
                 article.getTitle(),
                 article.getSlug(),
                 summaryOf(article),
-                article.getCover(),
+                coverOf(article),
                 article.getCategoryId(),
                 categoryName,
                 categorySlug,
@@ -202,7 +202,7 @@ public class ArticleServiceImpl implements ArticleService {
                 article.getTitle(),
                 article.getSlug(),
                 summaryOf(article),
-                article.getCover(),
+                coverOf(article),
                 article.getCategoryId(),
                 article.getCategoryId() == null ? null : categoryNames.get(article.getCategoryId()),
                 tagNames.getOrDefault(article.getId(), List.of()),
@@ -238,6 +238,26 @@ public class ArticleServiceImpl implements ArticleService {
     /**
      * 列表页展示用摘要：优先使用手工摘要，缺失时从 Markdown 正文截取，避免列表出现空白简介。
      */
+    /**
+     * 列表缩略图：优先用 cover；没设封面时取正文里的第一张图片，
+     * 这样首页卡片也能有图。
+     */
+    private String coverOf(Article article) {
+        if (article.getCover() != null && !article.getCover().isBlank()) {
+            return article.getCover();
+        }
+        String content = article.getContent() == null ? "" : article.getContent();
+        java.util.regex.Matcher md = java.util.regex.Pattern
+                .compile("!\\[[^\\]]*]\\((\\S+?)\\)").matcher(content);
+        if (md.find()) {
+            return md.group(1);
+        }
+        java.util.regex.Matcher html = java.util.regex.Pattern
+                .compile("<img[^>]+src=[\"']([^\"']+)[\"']", java.util.regex.Pattern.CASE_INSENSITIVE)
+                .matcher(content);
+        return html.find() ? html.group(1) : article.getCover();
+    }
+
     private String summaryOf(Article article) {
         if (article.getSummary() != null && !article.getSummary().isBlank()) {
             return article.getSummary();

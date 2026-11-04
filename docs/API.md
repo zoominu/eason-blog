@@ -288,13 +288,17 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
-| POST | `/admin/resources/upload` | `multipart/form-data`，字段名 `file`，≤5MB |
-| GET | `/admin/resources` | 分页，`keyword` 按文件名 |
+| POST | `/admin/resources/upload` | `multipart/form-data`，字段名 `file`，可选 `type`；单文件 ≤20MB |
+| GET | `/admin/resources` | 分页，`keyword` 按文件名，`type` 按分类筛选；返回 `articleCount` |
+| GET | `/admin/resources/{id}/references` | 该资源被哪些文章引用（id/title/slug/status） |
 | DELETE | `/admin/resources/{id}` | 被文章正文引用时 409 |
 | GET | `/uploads/{yyyy}/{MM}/{name}` | 静态访问（Nginx 生产同路径） |
 
-限制：扩展名白名单 `png/jpg/jpeg/gif/webp/svg/pdf/txt/md/zip`，MIME 需为 `image/*`、`text/*` 或 `application/pdf`；
-存储名随机（UUID），原始文件名只入库不落盘，防路径穿越。
+分类 `type`：`avatar`（头像）、`article_image`（文章图片）、`music`、`video`、`document`、`other`；
+不传时按 MIME/扩展名自动识别，后续新增类型只需扩展这个枚举。
+
+限制：扩展名白名单 `png/jpg/jpeg/gif/webp/svg/mp3/wav/ogg/m4a/flac/mp4/webm/mov/pdf/txt/md/zip`，
+MIME 需匹配对应类型；存储名随机（UUID），原始文件名只入库不落盘，防路径穿越。
 
 ### 4.6 日志
 
@@ -353,10 +357,19 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 - 仍然找不到的图片会保留原引用，并在 `warnings` 里列出；
 - 一次最多 30 张，单张 ≤5MB。
 
-批量审核：`POST /admin/comments/batch`、`POST /admin/guestbook/batch`，
-body `{ "ids": [1,2,3], "approve": true }`，返回 `{ "updated": n }`。
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/admin/resources/upload` | 上传资源（可选 `type`：avatar/article_image/music/video/document/other；不传按 MIME 自动识别） |
+| GET | `/admin/resources?type=` | 资源列表，可按类型筛选；返回每项被引用文章数 `articleCount` |
+| GET | `/admin/resources/{id}/references` | 该资源被哪些文章引用（id/title/slug/status） |
+
+文章删除不再进入回收站：`DELETE /admin/articles/{id}` 直接删除（后台与前台都不再出现）；
+只想让访客看不到时用 `POST /admin/articles/{id}/offline` 下线。
 
 后台列表（评论/留言/用户/日志/资源/文章）单页上限 100，公开接口仍为 50。
+
+批量审核：`POST /admin/comments/batch`、`POST /admin/guestbook/batch`，
+body `{ "ids": [1,2,3], "approve": true }`，返回 `{ "updated": n }`。
 
 操作日志由 `@Audit(module, action)` 注解 + AOP 切面写入，覆盖文章增改/发布/下线/回收、
 用户禁用启用、角色调整、系统设置、评论与留言审核、资源删除等关键写操作。

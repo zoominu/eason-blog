@@ -203,13 +203,15 @@ public class AdminArticleService {
         articleMapper.updateById(article);
     }
 
-    /** 移入回收站（status=3），不物理删除，便于误操作恢复。 */
+    /**
+     * 删除文章：直接逻辑删除（不再进回收站）。
+     *
+     * <p>想让文章对访客不可见时用「下线」，不要用删除；删除后前台和后台列表都不再出现。</p>
+     */
     @Transactional
     public void delete(Long id) {
-        Article article = require(id);
-        article.setStatus(RECYCLED);
-        article.setUpdateTime(LocalDateTime.now());
-        articleMapper.updateById(article);
+        require(id);
+        articleMapper.deleteById(id);
     }
 
     @Transactional

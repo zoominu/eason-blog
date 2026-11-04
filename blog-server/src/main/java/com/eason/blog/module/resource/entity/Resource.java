@@ -22,6 +22,8 @@ public class Resource {
     private String path;
     private String url;
     private String mimeType;
+    /** 资源分类：avatar / article_image / music / video / document / other */
+    private String type;
     private Long size;
     private String sha256;
     private LocalDateTime createTime;

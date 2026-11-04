@@ -5,6 +5,7 @@ import com.eason.blog.common.exception.BusinessException;
 import com.eason.blog.common.exception.ErrorCode;
 import com.eason.blog.config.AppProperties;
 import com.eason.blog.module.interaction.service.ContentAuditPolicy;
+import com.eason.blog.module.resource.service.ResourceService;
 import com.eason.blog.module.user.dto.ChangePasswordRequest;
 import com.eason.blog.module.user.dto.UpdateProfileRequest;
 import com.eason.blog.module.user.entity.User;
@@ -43,15 +44,18 @@ public class UserServiceImpl implements UserService {
     private final PasswordEncoder passwordEncoder;
     private final AppProperties properties;
     private final ContentAuditPolicy auditPolicy;
+    private final com.eason.blog.module.resource.service.ResourceService resourceService;
 
     public UserServiceImpl(UserMapper userMapper, UserRoleMapper userRoleMapper,
                            PasswordEncoder passwordEncoder, AppProperties properties,
-                           ContentAuditPolicy auditPolicy) {
+                           ContentAuditPolicy auditPolicy,
+                           com.eason.blog.module.resource.service.ResourceService resourceService) {
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
         this.passwordEncoder = passwordEncoder;
         this.properties = properties;
         this.auditPolicy = auditPolicy;
+        this.resourceService = resourceService;
     }
 
     @Override
@@ -115,8 +119,8 @@ public class UserServiceImpl implements UserService {
         }
 
         String original = StringUtils.hasText(file.getOriginalFilename())
-                ? Paths.get(file.getOriginalFilename()).getFileName().toString()
-                : "avatar";
+                ? Paths.get(file.getOriginalFilename().replace('\\', '/')).getFileName().toString()
+                : "avatar.png";
         int dot = original.lastIndexOf('.');
         String ext = dot >= 0 ? original.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
         if (!AVATAR_EXT.contains(ext)) {
@@ -127,27 +131,20 @@ public class UserServiceImpl implements UserService {
             throw BusinessException.badRequest("文件类型不是图片");
         }
 
-        String month = LocalDate.now().format(MONTH);
-        String stored = UUID.randomUUID().toString().replace("-", "") + "." + ext;
-        Path dir = Paths.get(properties.storage().uploadDir())
-                .toAbsolutePath().normalize()
-                .resolve("avatar")
-                .resolve(month);
+        byte[] bytes;
         try {
-            Files.createDirectories(dir);
-            try (var in = file.getInputStream()) {
-                Files.copy(in, dir.resolve(stored), StandardCopyOption.REPLACE_EXISTING);
-            }
+            bytes = file.getBytes();
         } catch (IOException e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "头像保存失败");
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "读取头像失败");
         }
+        // 头像也登记进资源库，方便在「资源管理 → 头像」里统一查看
+        var resource = resourceService.store(bytes, original, mime, id, ResourceService.TYPE_AVATAR);
 
-        String url = "/uploads/avatar/" + month + "/" + stored;
         User user = getById(id);
-        user.setAvatar(url);
+        user.setAvatar(resource.url());
         user.setUpdateTime(LocalDateTime.now());
         userMapper.updateById(user);
-        return url;
+        return resource.url();
     }
 
     @Override

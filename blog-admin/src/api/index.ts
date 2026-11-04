@@ -14,6 +14,7 @@ import type {
   PageResult,
   PermissionItem,
   ResourceItem,
+  ResourceRef,
   RoleItem,
   SystemConfigItem,
   Tag,
@@ -153,8 +154,9 @@ export const roleApi = {
 }
 
 export const resourceApi = {
-  list: (params: { keyword?: string; page?: number; size?: number }) =>
+  list: (params: { keyword?: string; type?: string; page?: number; size?: number }) =>
     get<PageResult<ResourceItem>>('/admin/resources', { ...params }),
+  references: (id: number) => get<ResourceRef[]>(`/admin/resources/${id}/references`),
   upload: (file: File) => {
     const form = new FormData()
     form.append('file', file)

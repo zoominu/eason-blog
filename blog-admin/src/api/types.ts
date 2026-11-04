@@ -182,9 +182,18 @@ export interface ResourceItem {
   originalName: string
   url: string
   mimeType: string
+  type: string
   size: number
   sha256?: string | null
+  articleCount: number
   createTime: string
+}
+
+export interface ResourceRef {
+  id: number
+  title: string
+  slug: string
+  status: number
 }
 
 export interface AdminLoginLog {

@@ -509,8 +509,6 @@ watch(
         <h1>{{ article.title }}</h1>
         <p class="summary">{{ article.summary }}</p>
 
-        <img v-if="article.cover" :src="article.cover" class="cover" :alt="article.title" />
-
         <div class="meta muted">
           <span><Calendar :size="14" /> {{ formatDate(article.publishTime) }}</span>
           <span><Clock :size="14" /> {{ readingLabel }}</span>
@@ -698,14 +696,6 @@ watch(
   margin: 14px 0 0;
   color: var(--fg-soft);
   font-size: 16px;
-}
-
-.cover {
-  width: 100%;
-  margin-top: 20px;
-  border-radius: 14px;
-  max-height: 380px;
-  object-fit: cover;
 }
 
 .meta {
