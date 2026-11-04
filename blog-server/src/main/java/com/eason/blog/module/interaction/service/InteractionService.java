@@ -3,6 +3,7 @@ package com.eason.blog.module.interaction.service;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.eason.blog.common.exception.BusinessException;
+import com.eason.blog.common.exception.ErrorCode;
 import com.eason.blog.common.response.PageResult;
 import com.eason.blog.common.security.RateLimiter;
 import com.eason.blog.module.article.entity.Article;
@@ -16,6 +17,7 @@ import com.eason.blog.module.comment.mapper.CommentMapper;
 import com.eason.blog.module.comment.vo.AdminCommentVO;
 import com.eason.blog.module.comment.vo.CommentVO;
 import com.eason.blog.module.comment.vo.InteractionVO;
+import com.eason.blog.module.comment.vo.MyCommentVO;
 import com.eason.blog.module.favorite.entity.Favorite;
 import com.eason.blog.module.favorite.mapper.FavoriteMapper;
 import com.eason.blog.module.guestbook.entity.Guestbook;
@@ -391,11 +393,12 @@ public class InteractionService {
         return new PageResult<>(records, total, page.getCurrent(), page.getSize(), page.getPages());
     }
 
-    // ----------------------------------------------------------------- 通知
+    // ------------------------------------------------------------------ 通知
 
-    public List<NotificationVO> notifications(Long userId, int limit) {
+    public List<NotificationVO> notifications(Long userId, int limit, String type) {
         return notificationMapper.selectList(Wrappers.<Notification>lambdaQuery()
                         .eq(Notification::getUserId, userId)
+                        .eq(org.springframework.util.StringUtils.hasText(type), Notification::getType, type)
                         .orderByDesc(Notification::getCreateTime)
                         .last("limit " + Math.min(Math.max(limit, 1), 50)))
                 .stream()
@@ -403,6 +406,138 @@ public class InteractionService {
                         n.getContent(), n.getLink(), n.getIsRead() != null && n.getIsRead() == 1,
                         n.getCreateTime()))
                 .toList();
+    }
+
+    // ------------------------------------------------------- 个人中心管理
+
+    /** 我点赞过的文章（只返回仍然公开可读的）。 */
+    public PageResult<ArticleSummaryVO> likes(Long userId, int pageNo, int size) {
+        Page<ArticleLike> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 50));
+        articleLikeMapper.selectPage(page, Wrappers.<ArticleLike>lambdaQuery()
+                .eq(ArticleLike::getUserId, userId)
+                .orderByDesc(ArticleLike::getCreateTime));
+        if (page.getRecords().isEmpty()) {
+            return PageResult.empty(pageNo, size);
+        }
+        List<Long> ids = page.getRecords().stream().map(ArticleLike::getArticleId).toList();
+        List<Article> readable = articleMapper.selectList(Wrappers.<Article>lambdaQuery()
+                .in(Article::getId, ids)
+                .eq(Article::getStatus, 1)
+                .eq(Article::getVisibility, 0));
+        Map<Long, Article> byId = readable.stream()
+                .collect(Collectors.toMap(Article::getId, Function.identity()));
+        Map<Long, List<String>> tagNames = tagResolver.byArticleIds(readable.stream()
+                .map(Article::getId).toList());
+
+        List<ArticleSummaryVO> records = ids.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .map(a -> toSummary(a, tagNames.getOrDefault(a.getId(), List.of())))
+                .toList();
+        long total = Math.max(0, page.getTotal() - (ids.size() - records.size()));
+        return new PageResult<>(records, total, page.getCurrent(), page.getSize(), page.getPages());
+    }
+
+    /** 批量取消点赞，返回实际取消数量。 */
+    @Transactional
+    public int unlikeBatch(Long userId, List<Long> articleIds) {
+        if (articleIds == null || articleIds.isEmpty()) {
+            return 0;
+        }
+        int removed = 0;
+        for (Long articleId : articleIds.stream().filter(Objects::nonNull).distinct().toList()) {
+            int deleted = articleLikeMapper.delete(Wrappers.<ArticleLike>lambdaQuery()
+                    .eq(ArticleLike::getUserId, userId)
+                    .eq(ArticleLike::getArticleId, articleId));
+            if (deleted > 0) {
+                articleMapper.updateLikeCount(articleId, -1);
+                removed++;
+            }
+        }
+        return removed;
+    }
+
+    /** 批量取消收藏，返回实际取消数量。 */
+    @Transactional
+    public int unfavoriteBatch(Long userId, List<Long> articleIds) {
+        if (articleIds == null || articleIds.isEmpty()) {
+            return 0;
+        }
+        return favoriteMapper.delete(Wrappers.<Favorite>lambdaQuery()
+                .eq(Favorite::getUserId, userId)
+                .in(Favorite::getArticleId, articleIds.stream().filter(Objects::nonNull).distinct().toList()));
+    }
+
+    /** 我的评论（含待审核/已拒绝），并给出是否可自行删除。 */
+    public PageResult<MyCommentVO> myComments(Long userId, int pageNo, int size) {
+        Page<Comment> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 50));
+        commentMapper.selectPage(page, Wrappers.<Comment>lambdaQuery()
+                .eq(Comment::getUserId, userId)
+                .orderByDesc(Comment::getCreateTime));
+        Map<Long, Article> articles = batchArticles(page.getRecords().stream()
+                .map(Comment::getArticleId).collect(Collectors.toSet()));
+
+        return PageResult.of(page, c -> {
+            Article article = articles.get(c.getArticleId());
+            boolean canDelete = Objects.equals(c.getUserId(), userId)
+                    && withinDeleteWindow(c)
+                    && !hasReplies(c.getId());
+            return new MyCommentVO(c.getId(), c.getArticleId(),
+                    article == null ? "文章已删除" : article.getTitle(),
+                    article == null ? null : article.getSlug(),
+                    c.getContent(), c.getStatus(), c.getCreateTime(), canDelete);
+        });
+    }
+
+    /** 删除自己的评论：限 3 分钟内、且没有回复。 */
+    @Transactional
+    public void deleteOwnComment(Long userId, Long commentId) {
+        Comment comment = commentMapper.selectById(commentId);
+        if (comment == null) {
+            throw BusinessException.notFound("评论不存在");
+        }
+        if (!Objects.equals(comment.getUserId(), userId)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只能删除自己的评论");
+        }
+        if (!withinDeleteWindow(comment)) {
+            throw BusinessException.badRequest("评论发布超过 3 分钟，无法删除");
+        }
+        if (hasReplies(commentId)) {
+            throw BusinessException.badRequest("该评论已有回复，无法删除");
+        }
+        commentMapper.deleteById(commentId);
+        if (comment.getStatus() != null && comment.getStatus() == APPROVED) {
+            articleMapper.updateCommentCount(comment.getArticleId(), -1);
+        }
+    }
+
+    /** 批量删除自己的评论：跳过超过时限或有回复的，返回删除数量。 */
+    @Transactional
+    public int deleteOwnComments(Long userId, List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return 0;
+        }
+        int deleted = 0;
+        for (Long id : ids.stream().filter(Objects::nonNull).distinct().toList()) {
+            try {
+                deleteOwnComment(userId, id);
+                deleted++;
+            } catch (BusinessException ignored) {
+                // 超时/有回复/不属于自己：跳过
+            }
+        }
+        return deleted;
+    }
+
+    private boolean withinDeleteWindow(Comment comment) {
+        return comment.getCreateTime() != null
+                && comment.getCreateTime().isAfter(LocalDateTime.now().minusMinutes(3));
+    }
+
+    private boolean hasReplies(Long commentId) {
+        Long count = commentMapper.selectCount(Wrappers.<Comment>lambdaQuery()
+                .eq(Comment::getParentId, commentId));
+        return count != null && count > 0;
     }
 
     public long unreadCount(Long userId) {

@@ -17,7 +17,7 @@ const props = defineProps<{
   focusId?: number | null
 }>()
 
-const emit = defineEmits<{ reply: [comment: CommentItem] }>()
+const emit = defineEmits<{ reply: [comment: CommentItem]; delete: [comment: CommentItem] }>()
 
 const expanded = ref(false)
 const contentExpanded = ref(false)
@@ -70,6 +70,13 @@ const visibleReplies = computed(() => {
 const hiddenCount = computed(() => replies.value.length - COLLAPSED_VISIBLE)
 const canNest = computed(() => (props.depth ?? 0) < maxDepth)
 
+/** 自己的评论 3 分钟内可删除（后端同样校验） */
+const canDelete = computed(() => {
+  if (!props.comment.mine || props.comment.hidden) return false
+  const created = new Date(props.comment.createTime).getTime()
+  return Number.isFinite(created) && Date.now() - created < 3 * 60 * 1000
+})
+
 watch(focusInside, (value) => {
   if (value) expanded.value = true
 })
@@ -102,9 +109,19 @@ watch(focusInside, (value) => {
       {{ contentExpanded ? '收起' : '显示全部' }}
     </button>
 
-    <!-- 最多四级：第 4 级不再提供回复入口；自己的评论、已隐藏的评论也不显示 -->
-    <div v-if="!comment.mine && !comment.hidden && (depth ?? 0) < 3" class="comment__actions">
-      <button class="comment__reply" @click="emit('reply', comment)">回复</button>
+    <!-- 回复限 4 级；自己的评论/已隐藏评论不显示回复；自己的评论 3 分钟内可删除 -->
+    <div
+      v-if="(!comment.mine && !comment.hidden && (depth ?? 0) < 3) || canDelete"
+      class="comment__actions"
+    >
+      <button
+        v-if="!comment.mine && !comment.hidden && (depth ?? 0) < 3"
+        class="comment__reply"
+        @click="emit('reply', comment)"
+      >
+        回复
+      </button>
+      <button v-if="canDelete" class="comment__delete" @click="emit('delete', comment)">删除</button>
     </div>
 
     <div v-if="replies.length && canNest" class="replies">
@@ -220,8 +237,9 @@ watch(focusInside, (value) => {
   gap: 12px;
 }
 
-/* 回复按钮平时隐藏，只覆盖当前这一条评论的悬停范围 */
-.comment__reply {
+/* 回复/删除按钮平时隐藏，只覆盖当前这一条评论的悬停范围 */
+.comment__reply,
+.comment__delete {
   margin-top: 6px;
   border: none;
   background: none;
@@ -233,13 +251,20 @@ watch(focusInside, (value) => {
   transition: opacity 0.15s ease;
 }
 
+.comment__delete {
+  color: #e5484d;
+}
+
 .comment:hover > .comment__actions > .comment__reply,
-.comment:focus-within > .comment__actions > .comment__reply {
+.comment:hover > .comment__actions > .comment__delete,
+.comment:focus-within > .comment__actions > .comment__reply,
+.comment:focus-within > .comment__actions > .comment__delete {
   opacity: 1;
 }
 
 @media (hover: none) {
-  .comment__reply {
+  .comment__reply,
+  .comment__delete {
     opacity: 1;
   }
 }

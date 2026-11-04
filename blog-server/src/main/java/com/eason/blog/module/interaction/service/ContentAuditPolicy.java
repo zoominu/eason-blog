@@ -54,6 +54,11 @@ public class ContentAuditPolicy {
         return "true".equalsIgnoreCase(config(key, "true"));
     }
 
+    /** 返回命中的违禁词，未命中返回 null。昵称等字段复用这套词库。 */
+    public String findBannedWord(String text) {
+        return firstHit(text, bannedWords());
+    }
+
     /** 违禁词：设置里每行一个，也兼容逗号分隔。 */
     public List<String> bannedWords() {
         String raw = config("audit.banned-words", "");

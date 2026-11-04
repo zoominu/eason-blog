@@ -49,19 +49,22 @@ public class AdminUserService {
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
     private final PasswordEncoder passwordEncoder;
+    private final com.eason.blog.module.interaction.service.ContentAuditPolicy auditPolicy;
 
     public AdminUserService(UserMapper userMapper,
                             UserRoleMapper userRoleMapper,
                             RoleMapper roleMapper,
                             RolePermissionMapper rolePermissionMapper,
                             PermissionMapper permissionMapper,
-                            PasswordEncoder passwordEncoder) {
+                            PasswordEncoder passwordEncoder,
+                            com.eason.blog.module.interaction.service.ContentAuditPolicy auditPolicy) {
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
         this.roleMapper = roleMapper;
         this.rolePermissionMapper = rolePermissionMapper;
         this.permissionMapper = permissionMapper;
         this.passwordEncoder = passwordEncoder;
+        this.auditPolicy = auditPolicy;
     }
 
     public PageResult<AdminUserVO> page(String keyword, Integer status, int pageNo, int size) {
@@ -101,9 +104,14 @@ public class AdminUserService {
         user.setUid(UUID.randomUUID().toString().replace("-", "").substring(0, 12));
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.password()));
-        user.setNickname(StringUtils.hasText(request.nickname())
+        String nickname = StringUtils.hasText(request.nickname())
                 ? request.nickname().trim()
-                : email.substring(0, email.indexOf('@')));
+                : email.substring(0, email.indexOf('@'));
+        String hitNickname = auditPolicy.findBannedWord(nickname);
+        if (hitNickname != null) {
+            throw BusinessException.badRequest("昵称包含违禁词：" + hitNickname);
+        }
+        user.setNickname(nickname);
         user.setStatus(1);
         user.setEmailVerified(0);
         user.setTokenVersion(0);
@@ -165,7 +173,12 @@ public class AdminUserService {
             if (!StringUtils.hasText(request.nickname())) {
                 throw BusinessException.badRequest("昵称不能为空");
             }
-            user.setNickname(request.nickname().trim());
+            String nickname = request.nickname().trim();
+            String hit = auditPolicy.findBannedWord(nickname);
+            if (hit != null) {
+                throw BusinessException.badRequest("昵称包含违禁词：" + hit);
+            }
+            user.setNickname(nickname);
         }
         if (request.avatar() != null) {
             user.setAvatar(request.avatar().trim());

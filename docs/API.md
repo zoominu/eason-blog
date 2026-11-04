@@ -322,6 +322,23 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | DELETE | `/admin/guestbook/{id}` | 删除留言 |
 | POST | `/admin/guestbook/batch-delete` | `{ "ids": [...] }`，返回 `{deleted}` |
 
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| GET | `/users/me/favorites` | 我的收藏（分页） |
+| POST | `/users/me/favorites/batch-remove` | `{articleIds:[...]}`，批量取消收藏 |
+| GET | `/users/me/likes` | 我点赞的文章（分页） |
+| POST | `/users/me/likes/batch-remove` | `{articleIds:[...]}`，批量取消点赞 |
+| GET | `/users/me/comments` | 我的评论（含状态、文章标题、是否可删） |
+| DELETE | `/users/me/comments/{id}` | 删除自己的评论：**3 分钟内**且没有回复 |
+| POST | `/users/me/comments/batch-delete` | `{ids:[...]}`，跳过超时/有回复的，返回删除数 |
+| POST | `/users/me/avatar` | multipart `file`，头像 ≤2MB，png/jpg/jpeg/gif/webp |
+| GET | `/users/me/notifications?type=` | `COMMENT` / `REPLY` / `SYSTEM`，不传为全部 |
+
+昵称规则：注册、修改资料、后台新增/编辑用户都会检查 `audit.banned-words`，
+命中直接 400（`昵称包含违禁词：xxx`）。
+
+评论删除规则：仅本人、创建 3 分钟内、没有回复；管理员删除不受此限制（会级联删除回复）。
+
 批量审核：`POST /admin/comments/batch`、`POST /admin/guestbook/batch`，
 body `{ "ids": [1,2,3], "approve": true }`，返回 `{ "updated": n }`。
 

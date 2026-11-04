@@ -4,6 +4,7 @@ import com.eason.blog.common.exception.BusinessException;
 import com.eason.blog.common.exception.ErrorCode;
 import com.eason.blog.common.mail.MailService;
 import com.eason.blog.config.AppProperties;
+import com.eason.blog.module.interaction.service.ContentAuditPolicy;
 import com.eason.blog.module.auth.dto.LoginRequest;
 import com.eason.blog.module.auth.dto.RegisterRequest;
 import com.eason.blog.module.auth.service.AuthService;
@@ -51,6 +52,7 @@ public class AuthServiceImpl implements AuthService {
     private final LoginLogMapper loginLogMapper;
     private final EmailTokenService emailTokenService;
     private final MailService mailService;
+    private final ContentAuditPolicy auditPolicy;
 
     public AuthServiceImpl(AuthenticationManager authenticationManager,
                            UserMapper userMapper,
@@ -62,7 +64,8 @@ public class AuthServiceImpl implements AuthService {
                            AppProperties properties,
                            LoginLogMapper loginLogMapper,
                            EmailTokenService emailTokenService,
-                           MailService mailService) {
+                           MailService mailService,
+                           ContentAuditPolicy auditPolicy) {
         this.authenticationManager = authenticationManager;
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
@@ -74,6 +77,7 @@ public class AuthServiceImpl implements AuthService {
         this.loginLogMapper = loginLogMapper;
         this.emailTokenService = emailTokenService;
         this.mailService = mailService;
+        this.auditPolicy = auditPolicy;
     }
 
     @Override
@@ -141,13 +145,20 @@ public class AuthServiceImpl implements AuthService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+        String nickname = StringUtils.hasText(request.nickname())
+                ? request.nickname().trim()
+                : email.substring(0, email.indexOf('@'));
+        // 昵称也走违禁词过滤
+        String hit = auditPolicy.findBannedWord(nickname);
+        if (hit != null) {
+            throw BusinessException.badRequest("昵称包含违禁词：" + hit);
+        }
+
         User user = new User();
         user.setUid("u" + UUID.randomUUID().toString().replace("-", "").substring(0, 12));
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.password()));
-        user.setNickname(StringUtils.hasText(request.nickname())
-                ? request.nickname().trim()
-                : email.substring(0, email.indexOf('@')));
+        user.setNickname(nickname);
         user.setStatus(1);
         user.setEmailVerified(0);
         user.setRegisterTime(now);

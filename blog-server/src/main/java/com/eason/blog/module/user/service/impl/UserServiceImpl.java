@@ -3,6 +3,8 @@ package com.eason.blog.module.user.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.eason.blog.common.exception.BusinessException;
 import com.eason.blog.common.exception.ErrorCode;
+import com.eason.blog.config.AppProperties;
+import com.eason.blog.module.interaction.service.ContentAuditPolicy;
 import com.eason.blog.module.user.dto.ChangePasswordRequest;
 import com.eason.blog.module.user.dto.UpdateProfileRequest;
 import com.eason.blog.module.user.entity.User;
@@ -14,21 +16,42 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
 public class UserServiceImpl implements UserService {
 
+    private static final long AVATAR_MAX_SIZE = 2L * 1024 * 1024;
+    private static final Set<String> AVATAR_EXT = Set.of("png", "jpg", "jpeg", "gif", "webp");
+    private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("yyyy/MM");
+
     private final UserMapper userMapper;
     private final UserRoleMapper userRoleMapper;
     private final PasswordEncoder passwordEncoder;
+    private final AppProperties properties;
+    private final ContentAuditPolicy auditPolicy;
 
-    public UserServiceImpl(UserMapper userMapper, UserRoleMapper userRoleMapper, PasswordEncoder passwordEncoder) {
+    public UserServiceImpl(UserMapper userMapper, UserRoleMapper userRoleMapper,
+                           PasswordEncoder passwordEncoder, AppProperties properties,
+                           ContentAuditPolicy auditPolicy) {
         this.userMapper = userMapper;
         this.userRoleMapper = userRoleMapper;
         this.passwordEncoder = passwordEncoder;
+        this.properties = properties;
+        this.auditPolicy = auditPolicy;
     }
 
     @Override
@@ -58,7 +81,9 @@ public class UserServiceImpl implements UserService {
         User user = getById(id);
         // 只覆盖显式传入的字段，未传字段保持原值（PATCH 语义）
         if (StringUtils.hasText(request.nickname())) {
-            user.setNickname(request.nickname().trim());
+            String nickname = request.nickname().trim();
+            checkNickname(nickname);
+            user.setNickname(nickname);
         }
         if (request.avatar() != null) {
             user.setAvatar(request.avatar());
@@ -69,6 +94,60 @@ public class UserServiceImpl implements UserService {
         user.setUpdateTime(LocalDateTime.now());
         userMapper.updateById(user);
         return toVO(user);
+    }
+
+    /** 昵称同样走违禁词过滤：命中直接拒绝，避免出现违规展示名。 */
+    private void checkNickname(String nickname) {
+        String hit = auditPolicy.findBannedWord(nickname);
+        if (hit != null) {
+            throw BusinessException.badRequest("昵称包含违禁词：" + hit);
+        }
+    }
+
+    @Override
+    @Transactional
+    public String uploadAvatar(Long id, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw BusinessException.badRequest("请选择图片");
+        }
+        if (file.getSize() > AVATAR_MAX_SIZE) {
+            throw BusinessException.badRequest("头像不能超过 2MB");
+        }
+
+        String original = StringUtils.hasText(file.getOriginalFilename())
+                ? Paths.get(file.getOriginalFilename()).getFileName().toString()
+                : "avatar";
+        int dot = original.lastIndexOf('.');
+        String ext = dot >= 0 ? original.substring(dot + 1).toLowerCase(Locale.ROOT) : "";
+        if (!AVATAR_EXT.contains(ext)) {
+            throw BusinessException.badRequest("头像仅支持 png/jpg/jpeg/gif/webp");
+        }
+        String mime = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        if (!mime.startsWith("image/")) {
+            throw BusinessException.badRequest("文件类型不是图片");
+        }
+
+        String month = LocalDate.now().format(MONTH);
+        String stored = UUID.randomUUID().toString().replace("-", "") + "." + ext;
+        Path dir = Paths.get(properties.storage().uploadDir())
+                .toAbsolutePath().normalize()
+                .resolve("avatar")
+                .resolve(month);
+        try {
+            Files.createDirectories(dir);
+            try (var in = file.getInputStream()) {
+                Files.copy(in, dir.resolve(stored), StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "头像保存失败");
+        }
+
+        String url = "/uploads/avatar/" + month + "/" + stored;
+        User user = getById(id);
+        user.setAvatar(url);
+        user.setUpdateTime(LocalDateTime.now());
+        userMapper.updateById(user);
+        return url;
     }
 
     @Override

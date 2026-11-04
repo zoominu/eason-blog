@@ -3,6 +3,8 @@ package com.eason.blog.module.interaction;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.eason.blog.module.article.entity.Article;
 import com.eason.blog.module.article.mapper.ArticleMapper;
+import com.eason.blog.module.comment.entity.Comment;
+import com.eason.blog.module.comment.mapper.CommentMapper;
 import com.eason.blog.module.system.entity.SystemConfig;
 import com.eason.blog.module.system.mapper.SystemConfigMapper;
 import com.eason.blog.module.user.entity.User;
@@ -21,6 +23,7 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -30,6 +33,8 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -56,6 +61,8 @@ class AuditPolicyTest {
     private ArticleMapper articleMapper;
     @Autowired
     private SystemConfigMapper configMapper;
+    @Autowired
+    private CommentMapper commentMapper;
     @Autowired
     private PasswordEncoder passwordEncoder;
 
@@ -251,6 +258,93 @@ class AuditPolicyTest {
                 .andExpect(status().isOk());
 
         assertThat(approvalNoticeCount(comment)).isEqualTo(1);
+    }
+
+    @Test
+    void nicknameIsCheckedAgainstBannedWords() throws Exception {
+        setConfig("audit.banned-words", "违禁昵称");
+
+        mockMvc.perform(patch("/api/v1/users/me").cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"nickname\":\"我的违禁昵称\"}"))
+                .andExpect(status().isBadRequest());
+
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"" + UUID.randomUUID().toString().substring(0, 8)
+                                + "@test.local\",\"password\":\"Test123456\",\"nickname\":\"违禁昵称用户\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void commentCannotBeDeletedAfterThreeMinutes() throws Exception {
+        long id = postComment(userCookie, "超时评论-" + UUID.randomUUID().toString().substring(0, 5), null);
+        Comment stored = commentMapper.selectById(id);
+        stored.setCreateTime(LocalDateTime.now().minusMinutes(5));
+        commentMapper.updateById(stored);
+
+        mockMvc.perform(delete("/api/v1/users/me/comments/" + id).cookie(userCookie))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void myCommentsCanBeListedAndDeletedWithinWindow() throws Exception {
+        long id = postComment(userCookie, "可删除评论-" + UUID.randomUUID().toString().substring(0, 5), null);
+
+        mockMvc.perform(get("/api/v1/users/me/comments?size=50").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[?(@.id == " + id + ")].canDelete").value(true));
+
+        mockMvc.perform(delete("/api/v1/users/me/comments/" + id).cookie(userCookie))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/users/me/comments?size=50").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[?(@.id == " + id + ")]").doesNotExist());
+    }
+
+    @Test
+    void likesCanBeListedAndRemovedInBatch() throws Exception {
+        mockMvc.perform(post("/api/v1/articles/" + articleId() + "/like").cookie(userCookie))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/users/me/likes?size=50").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[?(@.id == " + articleId() + ")]").exists());
+
+        mockMvc.perform(post("/api/v1/users/me/likes/batch-remove").cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"articleIds\":[" + articleId() + "]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.removed").value(1));
+
+        mockMvc.perform(get("/api/v1/users/me/likes?size=50").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[?(@.id == " + articleId() + ")]").doesNotExist());
+    }
+
+    @Test
+    void notificationTypeFilterWorks() throws Exception {
+        long id = postComment(userCookie, "通知分类-" + UUID.randomUUID().toString().substring(0, 5), null);
+        mockMvc.perform(post("/api/v1/admin/comments/" + id + "/approve").cookie(adminCookie))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/users/me/notifications?limit=50&type=SYSTEM").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.link =~ /.*comment=" + id + ".*/)]").exists());
+
+        mockMvc.perform(get("/api/v1/users/me/notifications?limit=50&type=REPLY").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[?(@.link =~ /.*comment=" + id + ".*/)]").doesNotExist());
+    }
+
+    @Test
+    void avatarUploadReturnsUrl() throws Exception {
+        MockMultipartFile file = new MockMultipartFile("file", "avatar.png", "image/png",
+                new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 1, 2, 3});
+        mockMvc.perform(multipart("/api/v1/users/me/avatar").file(file).cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.url").value(org.hamcrest.Matchers.startsWith("/uploads/avatar/")));
     }
 
     private int approvalNoticeCount(long commentId) throws Exception {

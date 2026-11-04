@@ -6,6 +6,7 @@ import type {
   Column,
   CommentItem,
   InteractionState,
+  MyComment,
   NotificationItem,
   PageResult,
   SiteConfig,
@@ -58,6 +59,11 @@ export const authApi = {
     patch<User>('/users/me', payload),
   changePassword: (oldPassword: string, newPassword: string) =>
     patch<void>('/users/me/password', { oldPassword, newPassword }),
+  uploadAvatar: (file: File) => {
+    const form = new FormData()
+    form.append('file', file)
+    return post<{ url: string }>('/users/me/avatar', form)
+  },
   forgotPassword: (email: string) => post<void>('/auth/forgot-password', { email }),
   resetPassword: (token: string, newPassword: string) =>
     post<void>('/auth/reset-password', { token, newPassword }),
@@ -80,7 +86,19 @@ export const interactionApi = {
 
   favorites: (page = 1, size = 10) =>
     get<PageResult<ArticleSummary>>('/users/me/favorites', { page, size }),
-  notifications: (limit = 20) => get<NotificationItem[]>('/users/me/notifications', { limit }),
+  removeFavorites: (articleIds: number[]) =>
+    post<{ removed: number }>('/users/me/favorites/batch-remove', { articleIds }),
+  likes: (page = 1, size = 10) =>
+    get<PageResult<ArticleSummary>>('/users/me/likes', { page, size }),
+  removeLikes: (articleIds: number[]) =>
+    post<{ removed: number }>('/users/me/likes/batch-remove', { articleIds }),
+  myComments: (page = 1, size = 10) =>
+    get<PageResult<MyComment>>('/users/me/comments', { page, size }),
+  deleteMyComment: (id: number) => del<void>(`/users/me/comments/${id}`),
+  deleteMyComments: (ids: number[]) =>
+    post<{ deleted: number }>('/users/me/comments/batch-delete', { ids }),
+  notifications: (limit = 20, type?: string) =>
+    get<NotificationItem[]>('/users/me/notifications', { limit, type }),
   unreadCount: () => get<{ count: number }>('/users/me/notifications/unread-count'),
   markRead: (id: number) => patch<void>(`/users/me/notifications/${id}/read`),
   markAllRead: () => patch<{ updated: number }>('/users/me/notifications/read-all'),

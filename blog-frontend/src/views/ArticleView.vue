@@ -397,6 +397,17 @@ function cancelReply() {
   commentText.value = ''
 }
 
+async function removeComment(comment: CommentItem) {
+  if (!window.confirm('确定删除这条评论？')) return
+  try {
+    await interactionApi.deleteMyComment(comment.id)
+    showToast('评论已删除')
+    await loadComments(commentsPage.value)
+  } catch (e) {
+    showToast((e as Error).message, 'info')
+  }
+}
+
 async function submitComment() {
   if (!requireLogin() || !article.value) return
   const content = commentText.value.trim()
@@ -586,6 +597,7 @@ watch(
             :depth="0"
             :focus-id="focusCommentId"
             @reply="startReply"
+            @delete="removeComment"
           />
         </div>
         <p v-else class="muted comments__empty">还没有评论，来说点什么吧。</p>

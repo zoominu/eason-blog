@@ -115,6 +115,18 @@ export interface CommentItem {
   replies: CommentItem[]
 }
 
+/** 个人中心「我的评论」 */
+export interface MyComment {
+  id: number
+  articleId: number
+  articleTitle: string
+  articleSlug: string | null
+  content: string
+  status: number
+  createTime: string
+  canDelete: boolean
+}
+
 export interface NotificationItem {
   id: number
   type: string
