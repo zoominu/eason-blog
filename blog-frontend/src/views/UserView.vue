@@ -5,12 +5,15 @@ import { Bell, Bookmark, LogOut, Save } from 'lucide-vue-next'
 import { authApi, interactionApi } from '@/api'
 import type { ArticleSummary, NotificationItem } from '@/api/types'
 import Pagination from '@/components/Pagination.vue'
+import { useNotificationStore } from '@/stores/notification'
 import { useUserStore } from '@/stores/user'
 import { formatDate, formatDateTime } from '@/utils/format'
+import { openNotification as openNotificationLink } from '@/utils/notifications'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const notifStore = useNotificationStore()
 
 type Tab = 'profile' | 'favorites' | 'notifications'
 const tab = ref<Tab>('profile')
@@ -76,6 +79,7 @@ async function markRead(item: NotificationItem) {
   if (!item.read) {
     await interactionApi.markRead(item.id)
     item.read = true
+    notifStore.fetchUnread()
   }
 }
 
@@ -86,20 +90,8 @@ async function markRead(item: NotificationItem) {
  */
 function openNotification(item: NotificationItem) {
   markRead(item)
-  const link = item.link
-  if (!link) return
-  if (link.startsWith('/admin')) {
-    window.open(`${adminUrl.value}${link.replace('/admin', '')}`, '_blank', 'noopener')
-    return
-  }
-  router.push(link)
+  openNotificationLink(item, router)
 }
-
-const adminUrl = computed(() => {
-  const configured = import.meta.env.VITE_ADMIN_URL
-  if (configured) return configured.replace(/\/$/, '')
-  return `${window.location.protocol}//${window.location.hostname}:5174`
-})
 
 const notifBusy = ref(false)
 const notifHint = ref('')
@@ -107,8 +99,8 @@ const notifHint = ref('')
 async function markAllRead() {
   notifBusy.value = true
   try {
-    const result = await interactionApi.markAllRead()
-    notifHint.value = `已标记 ${result.updated} 条为已读`
+    const updated = await notifStore.markAllRead()
+    notifHint.value = `已标记 ${updated} 条为已读`
     await loadNotifications()
   } catch (e) {
     notifHint.value = (e as Error).message
@@ -120,8 +112,8 @@ async function markAllRead() {
 async function deleteReadNotifications() {
   notifBusy.value = true
   try {
-    const result = await interactionApi.deleteRead()
-    notifHint.value = `已删除 ${result.deleted} 条已读通知`
+    const deleted = await notifStore.deleteRead()
+    notifHint.value = `已删除 ${deleted} 条已读通知`
     await loadNotifications()
   } catch (e) {
     notifHint.value = (e as Error).message
@@ -129,6 +121,14 @@ async function deleteReadNotifications() {
     notifBusy.value = false
   }
 }
+
+// 通知实时同步：轮询发现新通知时，如果正停在通知页就直接刷新列表
+watch(
+  () => notifStore.latestSeq,
+  () => {
+    if (tab.value === 'notifications') loadNotifications()
+  }
+)
 
 async function saveProfile() {
   saving.value = true

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { CommentItem } from '@/api/types'
 import { formatDateTime } from '@/utils/format'
 
@@ -7,12 +7,14 @@ import { formatDateTime } from '@/utils/format'
  * 递归评论节点。
  *
  * - 自己的评论不显示「回复」：后端也会拒绝自己回复自己；
- * - 回复超过 5 条时只展示前 3 条，其余折叠；
- * - 博主评论带「博主」标记。
+ * - 回复超过 5 条时只展示前 3 条，展开按钮放在回复列表末尾；
+ * - 博主评论带「博主」标记；
+ * - 从通知跳转时传 focusId，命中路径上的折叠评论会自动展开。
  */
 const props = defineProps<{
   comment: CommentItem
   depth?: number
+  focusId?: number | null
 }>()
 
 const emit = defineEmits<{ reply: [comment: CommentItem] }>()
@@ -24,13 +26,26 @@ const COLLAPSE_THRESHOLD = 5
 const COLLAPSED_VISIBLE = 3
 
 const replies = computed(() => props.comment.replies ?? [])
+
+/** 目标评论是否在自己或子孙里（用于自动展开折叠链） */
+function containsFocus(node: CommentItem, target: number): boolean {
+  if (node.id === target) return true
+  return (node.replies ?? []).some((child) => containsFocus(child, target))
+}
+
+const focusInside = computed(() => props.focusId != null && containsFocus(props.comment, props.focusId))
 const shouldCollapse = computed(() => replies.value.length > COLLAPSE_THRESHOLD)
+const expandedNow = computed(() => expanded.value || focusInside.value)
 const visibleReplies = computed(() => {
-  if (!shouldCollapse.value || expanded.value) return replies.value
+  if (!shouldCollapse.value || expandedNow.value) return replies.value
   return replies.value.slice(0, COLLAPSED_VISIBLE)
 })
 const hiddenCount = computed(() => replies.value.length - COLLAPSED_VISIBLE)
 const canNest = computed(() => (props.depth ?? 0) < maxDepth)
+
+watch(focusInside, (value) => {
+  if (value) expanded.value = true
+})
 </script>
 
 <template>
@@ -45,15 +60,8 @@ const canNest = computed(() => (props.depth ?? 0) < maxDepth)
 
     <p class="comment__content">{{ comment.content }}</p>
 
-    <div class="comment__actions">
-      <button v-if="!comment.mine" class="comment__reply" @click="emit('reply', comment)">回复</button>
-      <button
-        v-if="replies.length && canNest && shouldCollapse"
-        class="comment__reply"
-        @click="expanded = !expanded"
-      >
-        {{ expanded ? '收起回复' : `展开其余 ${hiddenCount} 条回复` }}
-      </button>
+    <div v-if="!comment.mine" class="comment__actions">
+      <button class="comment__reply" @click="emit('reply', comment)">回复</button>
     </div>
 
     <div v-if="replies.length && canNest" class="replies">
@@ -62,8 +70,14 @@ const canNest = computed(() => (props.depth ?? 0) < maxDepth)
         :key="child.id"
         :comment="child"
         :depth="(depth ?? 0) + 1"
+        :focus-id="focusId"
         @reply="(target) => emit('reply', target)"
       />
+
+      <!-- 展开按钮固定在最后一条回复下面，不再夹在正文与回复之间 -->
+      <button v-if="shouldCollapse" class="comment__expand" @click="expanded = !expanded">
+        {{ expandedNow ? '收起回复' : `展开其余 ${hiddenCount} 条回复` }}
+      </button>
     </div>
   </div>
 </template>
@@ -137,6 +151,7 @@ const canNest = computed(() => (props.depth ?? 0) < maxDepth)
   gap: 12px;
 }
 
+/* 回复按钮平时隐藏，鼠标靠近评论才出现，减少视觉噪音 */
 .comment__reply {
   margin-top: 6px;
   border: none;
@@ -145,6 +160,36 @@ const canNest = computed(() => (props.depth ?? 0) < maxDepth)
   font-size: 12px;
   color: var(--accent);
   cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.comment:hover .comment__reply,
+.comment:focus-within .comment__reply {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .comment__reply {
+    opacity: 1;
+  }
+}
+
+.comment__expand {
+  align-self: flex-start;
+  margin-top: 2px;
+  border: 1px dashed var(--border);
+  border-radius: 999px;
+  background: none;
+  padding: 4px 12px;
+  font-size: 12px;
+  color: var(--fg-soft);
+  cursor: pointer;
+}
+
+.comment__expand:hover {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .replies {

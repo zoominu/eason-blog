@@ -311,6 +311,16 @@ body `{ "ids": [1,2,3], "approve": true }`，返回 `{ "updated": n }`。
 | GET | `/admin/settings` | 全部配置（含非公开） |
 | PATCH | `/admin/settings` | `{ "site.title": "…" }`，只允许更新已存在的 key |
 
+审核相关配置（后台「系统设置 → 审核与违禁词」）：
+
+| key | 取值 | 说明 |
+| --- | --- | --- |
+| `comment.audit` / `guestbook.audit` | `true` / `false` | 是否全部先审后发；`false` 时只拦截违禁词 |
+| `audit.banned-words` | 文本，每行或逗号分隔 | 命中后按下面配置处理 |
+| `audit.banned-action` | `review` / `mask` | `review` 转待审核；`mask` 替换为等长 `*` 后发布 |
+
+> 管理员（SUPER_ADMIN）发布的评论/回复始终免审，直接展示。
+
 ### 4.8 限流
 
 | 接口 | 限制 |

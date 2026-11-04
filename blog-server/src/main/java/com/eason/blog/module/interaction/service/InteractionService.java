@@ -72,6 +72,7 @@ public class InteractionService {
     private final RateLimiter rateLimiter;
     private final ArticleTagResolver tagResolver;
     private final UserRoleMapper userRoleMapper;
+    private final ContentAuditPolicy auditPolicy;
 
     public InteractionService(ArticleMapper articleMapper,
                               CommentMapper commentMapper,
@@ -83,7 +84,8 @@ public class InteractionService {
                               CategoryMapper categoryMapper,
                               RateLimiter rateLimiter,
                               ArticleTagResolver tagResolver,
-                              UserRoleMapper userRoleMapper) {
+                              UserRoleMapper userRoleMapper,
+                              ContentAuditPolicy auditPolicy) {
         this.articleMapper = articleMapper;
         this.commentMapper = commentMapper;
         this.favoriteMapper = favoriteMapper;
@@ -95,6 +97,7 @@ public class InteractionService {
         this.rateLimiter = rateLimiter;
         this.tagResolver = tagResolver;
         this.userRoleMapper = userRoleMapper;
+        this.auditPolicy = auditPolicy;
     }
 
     // ------------------------------------------------------------------ 评论
@@ -180,28 +183,44 @@ public class InteractionService {
         }
 
         LocalDateTime now = LocalDateTime.now();
+        boolean isAdmin = userRoleMapper.selectRoleCodesByUserId(userId).contains("SUPER_ADMIN");
+        // 管理员评论直接发布；普通用户按「审核开关 + 违禁词」策略决定
+        ContentAuditPolicy.Result audit = isAdmin
+                ? new ContentAuditPolicy.Result(APPROVED, content.trim(), null)
+                : auditPolicy.check(content.trim(), "comment.audit");
+
         Comment comment = new Comment();
         comment.setArticleId(articleId);
         comment.setUserId(userId);
         comment.setParentId(parent == null ? 0L : parent.getId());
-        comment.setContent(content.trim());
-        comment.setStatus(PENDING);
+        comment.setContent(audit.content());
+        comment.setStatus(audit.status());
         comment.setIp(ip);
         comment.setCreateTime(now);
         comment.setUpdateTime(now);
         comment.setIsDeleted(0);
         commentMapper.insert(comment);
 
+        if (audit.status() == APPROVED) {
+            articleMapper.updateCommentCount(articleId, 1);
+        }
+
         User author = userMapper.selectById(userId);
         String nickname = author == null ? "访客" : author.getNickname();
+        boolean published = audit.status() == APPROVED;
 
         // 通知文章作者（本站只有一个作者，即管理员）：带评论摘要与定位参数
-        notify(article.getAuthorId(), "COMMENT", "收到新评论",
-                nickname + " 评论了《" + article.getTitle() + "》：「" + excerpt(content) + "」，待审核",
-                "/admin/comments?highlight=" + comment.getId());
+        if (!Objects.equals(article.getAuthorId(), userId)) {
+            notify(article.getAuthorId(), "COMMENT", published ? "收到新评论" : "收到待审核评论",
+                    nickname + " 评论了《" + article.getTitle() + "》：「" + excerpt(audit.content())
+                            + "」" + (published ? "，已发布" : "，待审核"),
+                    published
+                            ? "/article/" + article.getSlug() + "?comment=" + comment.getId()
+                            : "/admin/comments?highlight=" + comment.getId());
+        }
         if (parent != null && !Objects.equals(parent.getUserId(), userId)) {
             notify(parent.getUserId(), "REPLY", "有人回复了你的评论",
-                    nickname + " 回复了你在《" + article.getTitle() + "》下的评论：「" + excerpt(content) + "」",
+                    nickname + " 回复了你在《" + article.getTitle() + "》下的评论：「" + excerpt(audit.content()) + "」",
                     "/article/" + article.getSlug() + "?comment=" + comment.getId());
         }
         return comment.getId();
@@ -398,13 +417,18 @@ public class InteractionService {
             throw BusinessException.notFound("用户不存在");
         }
         LocalDateTime now = LocalDateTime.now();
+        boolean isAdmin = userRoleMapper.selectRoleCodesByUserId(userId).contains("SUPER_ADMIN");
+        ContentAuditPolicy.Result audit = isAdmin
+                ? new ContentAuditPolicy.Result(APPROVED, content.trim(), null)
+                : auditPolicy.check(content.trim(), "guestbook.audit");
+
         Guestbook guestbook = new Guestbook();
         guestbook.setUserId(userId);
         guestbook.setNickname(user.getNickname());
         guestbook.setEmail(user.getEmail());
-        guestbook.setContent(content.trim());
+        guestbook.setContent(audit.content());
         guestbook.setParentId(0L);
-        guestbook.setStatus(PENDING);
+        guestbook.setStatus(audit.status());
         guestbook.setIp(ip);
         guestbook.setCreateTime(now);
         guestbook.setUpdateTime(now);

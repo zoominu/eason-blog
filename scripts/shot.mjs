@@ -65,6 +65,22 @@ await send('Emulation.setDeviceMetricsOverride', {
 await send('Page.navigate', { url })
 await new Promise((r) => setTimeout(r, 6000))
 
+// 可选第 6 个参数：滚动到包含该文本的元素（例如设置页的分组标题）
+const scrollToText = process.argv[7]
+if (scrollToText) {
+  await send('Runtime.evaluate', {
+    expression: `(() => {
+      const target = [...document.querySelectorAll('*')]
+        .find((el) => el.children.length === 0 && (el.textContent || '').includes(${JSON.stringify(scrollToText)}))
+      if (target) target.scrollIntoView({ block: 'start' })
+      window.scrollBy(0, -90)
+      return Boolean(target)
+    })()`,
+    returnByValue: true
+  })
+  await new Promise((r) => setTimeout(r, 700))
+}
+
 const shot = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false })
 if (!shot.result?.data) {
   console.error('no screenshot data', JSON.stringify(shot).slice(0, 300))

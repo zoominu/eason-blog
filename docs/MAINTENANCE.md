@@ -262,6 +262,29 @@ sudo systemctl start eason-blog
 sudo cat /etc/eason-blog.env
 ```
 
+### 7.1 评论 / 留言审核策略
+
+在后台「系统设置 → 审核与违禁词」调整（即时生效，无需重启）：
+
+| 配置 | 作用 |
+| --- | --- |
+| `comment.audit` / `guestbook.audit` = 需要审核后展示 | 所有评论/留言先待审核（旧行为） |
+| 上面两项 = 直接展示 | 默认直接发布，只有命中违禁词才处理 |
+| `audit.banned-words` | 违禁词，每行一个或逗号分隔 |
+| `audit.banned-action` = 转人工审核 | 命中后进入待审核列表 |
+| `audit.banned-action` = 替换为 * 后展示 | 命中词替换成等长 `*`，直接发布 |
+
+> 管理员（SUPER_ADMIN）发布的评论/回复**始终免审**，直接展示。
+> 当前虚拟机配置：`comment.audit=false`、`guestbook.audit=false`，违禁词为空、命中转审核。
+
+修改可用后台界面，也可调接口：
+
+```bash
+curl -X PATCH http://127.0.0.1/api/v1/admin/settings \
+  -H 'Content-Type: application/json' -b 'blog_token=<管理员 Cookie>' \
+  -d '{"comment.audit":"false","audit.banned-words":"违禁词1\n违禁词2","audit.banned-action":"review"}'
+```
+
 ---
 
 ## 8. 日志与排查

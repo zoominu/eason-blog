@@ -65,6 +65,8 @@ const submitting = ref(false)
 const commentHint = ref('')
 const lightbox = ref<string | null>(null)
 const siteConfig = ref<Record<string, string>>({})
+/** 从通知跳转时指定的评论 id：用于自动展开折叠的回复链并高亮 */
+const focusCommentId = ref<number | null>(null)
 
 marked.setOptions({ gfm: true, breaks: false })
 
@@ -122,9 +124,10 @@ async function load(slug: string) {
     commentsError.value = (e as Error).message
   }
 
-  // 通知里带 ?comment=ID：定位并高亮该条评论
+  // 通知里带 ?comment=ID：定位并高亮该条评论（折叠的回复会自动展开）
   const targetComment = route.query.comment
   if (targetComment) {
+    focusCommentId.value = Number(targetComment) || null
     await nextTick()
     focusComment(String(targetComment))
   }
@@ -537,6 +540,7 @@ watch(
             :key="comment.id"
             :comment="comment"
             :depth="0"
+            :focus-id="focusCommentId"
             @reply="startReply"
           />
         </div>

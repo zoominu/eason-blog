@@ -3,18 +3,26 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Bell, Menu, X, PenLine, LogOut, Search, UserRound } from 'lucide-vue-next'
 import ThemeToggle from './ThemeToggle.vue'
-import { interactionApi } from '@/api'
+import { useNotificationStore } from '@/stores/notification'
 import { useUserStore } from '@/stores/user'
+import { adminBase } from '@/utils/admin'
+import { openNotification } from '@/utils/notifications'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+const notifStore = useNotificationStore()
 
 const scrolled = ref(false)
 const menuOpen = ref(false)
 const userMenuOpen = ref(false)
 const userMenuRef = ref<HTMLElement | null>(null)
-const unread = ref(0)
+
+/** 右上角「新通知」轻提示：自动消失，不挡操作 */
+const newNotification = ref<{ id: number; title: string; content: string } | null>(null)
+let notifTimer: number | undefined
+
+const unread = computed(() => notifStore.unread)
 
 const navItems = [
   { label: '首页', to: '/', match: ['home'] },
@@ -33,16 +41,7 @@ function isActive(item: { match: string[] }) {
 }
 
 const canWrite = computed(() => userStore.isAdmin)
-
-/**
- * 后台地址：生产由 VITE_ADMIN_URL 指向 /admin/（同域反代），
- * 开发默认 5174；不再硬编码 host:5174，避免线上点「写文章」连不上。
- */
-const adminUrl = computed(() => {
-  const configured = import.meta.env.VITE_ADMIN_URL
-  if (configured) return configured
-  return `${window.location.protocol}//${window.location.hostname}:5174`
-})
+const adminUrl = computed(() => adminBase())
 
 function onScroll() {
   scrolled.value = window.scrollY > 8
@@ -59,32 +58,45 @@ function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape') {
     userMenuOpen.value = false
     menuOpen.value = false
+    newNotification.value = null
   }
 }
 
-async function refreshUnread() {
-  if (!userStore.isLoggedIn) {
-    unread.value = 0
-    return
-  }
-  try {
-    const result = await interactionApi.unreadCount()
-    unread.value = result.count
-  } catch {
-    unread.value = 0
-  }
+function openLatest() {
+  if (!notifStore.latest) return
+  openNotification(notifStore.latest, router)
+  newNotification.value = null
 }
 
 async function logout() {
   await userStore.logout()
   userMenuOpen.value = false
-  unread.value = 0
+  notifStore.stopPolling()
   router.push('/')
 }
 
 watch(
   () => userStore.user?.id,
-  () => refreshUnread()
+  (id) => {
+    if (id) notifStore.startPolling()
+    else notifStore.stopPolling()
+  },
+  { immediate: true }
+)
+
+// 轮询发现新通知时弹一个小卡片，6 秒自动消失
+watch(
+  () => notifStore.latestSeq,
+  () => {
+    if (!notifStore.latest) return
+    newNotification.value = {
+      id: notifStore.latest.id,
+      title: notifStore.latest.title,
+      content: notifStore.latest.content ?? ''
+    }
+    window.clearTimeout(notifTimer)
+    notifTimer = window.setTimeout(() => (newNotification.value = null), 6000)
+  }
 )
 
 watch(
@@ -92,13 +104,13 @@ watch(
   () => {
     userMenuOpen.value = false
     menuOpen.value = false
-    refreshUnread()
+    if (userStore.isLoggedIn) notifStore.fetchUnread()
   }
 )
 
 onMounted(() => {
   onScroll()
-  refreshUnread()
+  if (userStore.isLoggedIn) notifStore.startPolling()
   window.addEventListener('scroll', onScroll, { passive: true })
   document.addEventListener('click', onDocumentClick)
   document.addEventListener('keydown', onKeydown)
@@ -108,6 +120,8 @@ onUnmounted(() => {
   window.removeEventListener('scroll', onScroll)
   document.removeEventListener('click', onDocumentClick)
   document.removeEventListener('keydown', onKeydown)
+  window.clearTimeout(notifTimer)
+  notifStore.stopPolling()
 })
 </script>
 
@@ -190,9 +204,93 @@ onUnmounted(() => {
       </div>
     </div>
   </header>
+
+  <!-- 新通知轻提示：右上角、自动消失、点击直达 -->
+  <Transition name="notif-pop">
+    <div v-if="newNotification" class="notif-toast" role="status" @click="openLatest">
+      <Bell :size="16" class="notif-toast__icon" />
+      <div class="notif-toast__body">
+        <p class="notif-toast__title">{{ newNotification.title }}</p>
+        <p class="notif-toast__content">{{ newNotification.content }}</p>
+      </div>
+      <button class="notif-toast__close" aria-label="关闭" @click.stop="newNotification = null">×</button>
+    </div>
+  </Transition>
 </template>
 
 <style scoped>
+.notif-toast {
+  position: fixed;
+  top: 76px;
+  right: 24px;
+  z-index: 120;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--nav-bg);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.16);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.notif-toast:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+
+.notif-toast__icon {
+  color: var(--accent);
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.notif-toast__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.notif-toast__title {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.notif-toast__content {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fg-soft);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.notif-toast__close {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.notif-pop-enter-active,
+.notif-pop-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.notif-pop-enter-from,
+.notif-pop-leave-to {
+  opacity: 0;
+  transform: translateX(12px);
+}
 .nav {
   position: fixed;
   inset: 0 0 auto 0;

@@ -30,6 +30,10 @@ const SELECT_OPTIONS: Record<string, { label: string; value: string }[]> = {
     { label: '本地磁盘', value: 'local' },
     { label: '对象存储（未实现）', value: 'oss' }
   ],
+  'audit.banned-action': [
+    { label: '转人工审核（默认）', value: 'review' },
+    { label: '替换为 * 后展示', value: 'mask' }
+  ],
   'site.theme': [
     { label: '跟随系统', value: 'system' },
     { label: '浅色', value: 'light' },
@@ -49,9 +53,13 @@ function optionsFor(key: string) {
   return null
 }
 
-/** 分享模板这类多行文案用 textarea */
+/** 分享模板、违禁词这类多行文本用 textarea */
 function isMultiline(item: SystemConfigItem) {
-  return item.key === 'share.template' || (item.description ?? '').includes('模板')
+  return (
+    item.key === 'share.template' ||
+    item.key === 'audit.banned-words' ||
+    (item.description ?? '').includes('模板')
+  )
 }
 
 const groups = computed(() => {
@@ -67,6 +75,7 @@ const groups = computed(() => {
     guestbook: '留言',
     register: '注册',
     storage: '存储',
+    audit: '审核与违禁词',
     share: '分享',
     其他: '其他'
   }
