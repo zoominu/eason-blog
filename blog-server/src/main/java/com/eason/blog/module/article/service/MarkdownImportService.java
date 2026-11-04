@@ -2,20 +2,24 @@ package com.eason.blog.module.article.service;
 
 import com.eason.blog.common.exception.BusinessException;
 import com.eason.blog.common.exception.ErrorCode;
-import com.eason.blog.config.AppProperties;
+import com.eason.blog.module.resource.service.ResourceService;
+import com.eason.blog.module.resource.vo.ResourceVO;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashMap;
@@ -24,18 +28,20 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 导入 Markdown：解析正文、上传随文图片并把引用改写成 /uploads 地址。
+ * 导入 Markdown：解析正文，并把随文图片收进「资源库」后改写引用。
  *
- * <p>图片有两种来源：
+ * <p>支持的图片引用：
  * <ul>
- *   <li>正文里的 base64 内嵌图片（data:image/...;base64,...）；</li>
- *   <li>随 md 一起选中的本地图片文件，按文件名匹配 md 里的相对路径。</li>
+ *   <li>base64 内嵌：{@code data:image/png;base64,...}</li>
+ *   <li>http(s) 绝对地址：服务端下载后存资源库（做了内网地址拦截）</li>
+ *   <li>本机绝对路径：如果后端能读到该路径（本地开发），直接读取上传</li>
+ *   <li>相对路径 / 本地路径但后端读不到：按文件名匹配随 md 一起选中的图片</li>
  * </ul>
+ * 所有图片最终都会写入 {@code blog_resource}，在「资源管理」里可查。
  * 返回的是改写后的 Markdown，管理员确认后再保存文章。</p>
  */
 @Service
@@ -46,28 +52,29 @@ public class MarkdownImportService {
     private static final int MAX_IMAGES = 30;
     private static final Set<String> MD_EXT = Set.of("md", "markdown");
     private static final Set<String> IMAGE_EXT = Set.of("png", "jpg", "jpeg", "gif", "webp", "svg");
-    private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("yyyy/MM");
 
     private static final Pattern MD_IMAGE = Pattern.compile("!\\[([^\\]]*)]\\(([^)\\s]+)\\)");
     private static final Pattern HTML_IMAGE = Pattern.compile("(<img[^>]+src=[\"'])([^\"']+)([\"'])",
             Pattern.CASE_INSENSITIVE);
     private static final Pattern DATA_IMAGE = Pattern.compile(
-            "^data:image/(png|jpeg|jpg|gif|webp|svg\\+xml);base64,(.+)$", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+            "^data:image/(png|jpeg|jpg|gif|webp|svg\\+xml);base64,(.+)$",
+            Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+    private static final Pattern WINDOWS_ABSOLUTE = Pattern.compile("^[A-Za-z]:[\\\\/].*");
 
-    private final AppProperties properties;
+    private final ResourceService resourceService;
 
-    public MarkdownImportService(AppProperties properties) {
-        this.properties = properties;
+    public MarkdownImportService(ResourceService resourceService) {
+        this.resourceService = resourceService;
     }
 
-    public record ImportedImage(String name, String url) {
+    public record ImportedImage(String name, String url, Long resourceId) {
     }
 
     public record ImportResult(String title, String slug, String summary, String cover,
                                String content, List<ImportedImage> images, List<String> warnings) {
     }
 
-    public ImportResult importMarkdown(MultipartFile file, List<MultipartFile> images) {
+    public ImportResult importMarkdown(MultipartFile file, List<MultipartFile> images, Long uploaderId) {
         if (file == null || file.isEmpty()) {
             throw BusinessException.badRequest("请选择 Markdown 文件");
         }
@@ -75,8 +82,7 @@ public class MarkdownImportService {
             throw BusinessException.badRequest("Markdown 文件不能超过 2MB");
         }
         String originalName = file.getOriginalFilename() == null ? "article.md" : file.getOriginalFilename();
-        String ext = extension(originalName);
-        if (!MD_EXT.contains(ext)) {
+        if (!MD_EXT.contains(extension(originalName))) {
             throw BusinessException.badRequest("只支持 .md / .markdown 文件");
         }
 
@@ -103,22 +109,18 @@ public class MarkdownImportService {
                 if (image == null || image.isEmpty()) {
                     continue;
                 }
-                ImportedImage saved;
-                try {
-                    saved = saveImage(image, image.getBytes(), extension(nameOf(image)));
-                } catch (IOException e) {
-                    throw new BusinessException(ErrorCode.INTERNAL_ERROR, "读取图片失败：" + nameOf(image));
+                String name = nameOf(image);
+                ImportedImage saved = storeImage(bytesOf(image, name), name,
+                        image.getContentType(), uploaderId, warnings);
+                if (saved != null) {
+                    imported.add(saved);
+                    uploadedByBaseName.put(baseName(name).toLowerCase(Locale.ROOT), saved.url());
                 }
-                imported.add(saved);
-                uploadedByBaseName.put(baseName(saved.name()).toLowerCase(Locale.ROOT), saved.url());
             }
         }
 
-        // 1) base64 内嵌图片
-        body = replaceDataImages(body, imported);
-
-        // 2) 相对路径图片：按文件名匹配本次上传的图片
-        body = replaceRelativeImages(body, uploadedByBaseName, warnings);
+        body = rewriteMarkdownImages(body, uploadedByBaseName, imported, warnings, uploaderId);
+        body = rewriteHtmlImages(body, uploadedByBaseName, imported, warnings, uploaderId);
 
         String title = front.values.getOrDefault("title", "");
         if (!StringUtils.hasText(title)) {
@@ -151,147 +153,221 @@ public class MarkdownImportService {
                 warnings);
     }
 
-    // ------------------------------------------------------------ 图片处理
+    // ------------------------------------------------------------ 图片改写
 
-    private String replaceDataImages(String body, List<ImportedImage> imported) {
-        String result = replaceDataInMarkdown(body, imported);
-        return replaceDataInHtml(result, imported);
-    }
-
-    private String replaceDataInMarkdown(String body, List<ImportedImage> imported) {
+    private String rewriteMarkdownImages(String body, Map<String, String> uploaded,
+                                         List<ImportedImage> imported, List<String> warnings, Long uploaderId) {
         Matcher matcher = MD_IMAGE.matcher(body);
         StringBuilder sb = new StringBuilder();
         while (matcher.find()) {
             String alt = matcher.group(1);
             String target = matcher.group(2);
-            String replacement = matcher.group(0);
-            Matcher data = DATA_IMAGE.matcher(target);
-            if (data.matches()) {
-                ImportedImage saved = saveBase64(data.group(1), data.group(2), imported);
-                if (saved != null) {
-                    replacement = "![" + alt + "](" + saved.url() + ")";
-                }
-            }
+            String url = resolveImage(target, uploaded, imported, warnings, uploaderId);
+            String replacement = url == null ? matcher.group(0) : "![" + alt + "](" + url + ")";
             matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(sb);
         return sb.toString();
     }
 
-    private String replaceDataInHtml(String body, List<ImportedImage> imported) {
+    private String rewriteHtmlImages(String body, Map<String, String> uploaded,
+                                     List<ImportedImage> imported, List<String> warnings, Long uploaderId) {
         Matcher matcher = HTML_IMAGE.matcher(body);
         StringBuilder sb = new StringBuilder();
         while (matcher.find()) {
             String target = matcher.group(2);
-            String replacement = matcher.group(0);
-            Matcher data = DATA_IMAGE.matcher(target);
-            if (data.matches()) {
-                ImportedImage saved = saveBase64(data.group(1), data.group(2), imported);
-                if (saved != null) {
-                    replacement = matcher.group(1) + saved.url() + matcher.group(3);
-                }
-            }
+            String url = resolveImage(target, uploaded, imported, warnings, uploaderId);
+            String replacement = url == null ? matcher.group(0) : matcher.group(1) + url + matcher.group(3);
             matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(sb);
         return sb.toString();
     }
 
-    private ImportedImage saveBase64(String subtype, String encoded, List<ImportedImage> imported) {
-        try {
-            byte[] bytes = Base64.getMimeDecoder().decode(encoded.replaceAll("\\s", ""));
-            String ext = "svg+xml".equalsIgnoreCase(subtype) ? "svg" : subtype.toLowerCase(Locale.ROOT);
+    /** 返回可用的图片 URL；解析失败返回 null（保留原文并记一条 warning）。 */
+    private String resolveImage(String target, Map<String, String> uploaded,
+                                List<ImportedImage> imported, List<String> warnings, Long uploaderId) {
+        if (!StringUtils.hasText(target)) {
+            return null;
+        }
+        if (target.startsWith("/uploads/")) {
+            return target; // 已经是本地上传地址
+        }
+
+        // 1) base64 内嵌
+        Matcher data = DATA_IMAGE.matcher(target);
+        if (data.matches()) {
+            byte[] bytes = decodeBase64(data.group(2));
+            if (bytes == null) {
+                warnings.add("base64 图片解析失败");
+                return null;
+            }
+            String ext = "svg+xml".equalsIgnoreCase(data.group(1)) ? "svg" : data.group(1).toLowerCase(Locale.ROOT);
             if ("jpeg".equals(ext)) {
                 ext = "jpg";
             }
-            ImportedImage saved = saveImage(null, bytes, ext);
-            imported.add(saved);
-            return saved;
+            ImportedImage saved = storeImage(bytes, "inline-" + System.nanoTime() + "." + ext,
+                    "image/" + data.group(1).replace("+xml", ""), uploaderId, warnings);
+            if (saved != null) {
+                imported.add(saved);
+                return saved.url();
+            }
+            return null;
+        }
+
+        // 2) 随 md 一起选中的文件（按文件名匹配，兼容绝对路径）
+        String base = baseName(target);
+        String fromUpload = uploaded.get(base.toLowerCase(Locale.ROOT));
+        if (fromUpload != null) {
+            return fromUpload;
+        }
+
+        // 3) http(s) 绝对地址：下载后存资源库
+        if (isHttp(target)) {
+            byte[] bytes = download(target, warnings);
+            if (bytes == null) {
+                return null;
+            }
+            ImportedImage saved = storeImage(bytes, base, guessMime(base), uploaderId, warnings);
+            if (saved != null) {
+                imported.add(saved);
+                return saved.url();
+            }
+            return null;
+        }
+
+        // 4) 后端能直接读到的绝对路径（本地开发时常见）
+        Path local = toLocalPath(target);
+        if (local != null) {
+            try {
+                if (Files.isReadable(local) && Files.isRegularFile(local)) {
+                    ImportedImage saved = storeImage(Files.readAllBytes(local), base,
+                            guessMime(base), uploaderId, warnings);
+                    if (saved != null) {
+                        imported.add(saved);
+                        return saved.url();
+                    }
+                    return null;
+                }
+            } catch (IOException ignored) {
+                // 落到下面的提示
+            }
+        }
+
+        warnings.add("未找到图片：" + target + "（本地图片请与 md 一起选中再导入）");
+        return null;
+    }
+
+    private ImportedImage storeImage(byte[] bytes, String name, String mime, Long uploaderId,
+                                     List<String> warnings) {
+        if (bytes == null || bytes.length == 0) {
+            warnings.add("空图片：" + name);
+            return null;
+        }
+        if (bytes.length > MAX_IMAGE_SIZE) {
+            warnings.add("图片超过 5MB，已跳过：" + name);
+            return null;
+        }
+        String ext = extension(name);
+        if (!IMAGE_EXT.contains(ext)) {
+            warnings.add("不支持的图片格式：" + name);
+            return null;
+        }
+        String contentType = StringUtils.hasText(mime) ? mime : guessMime(name);
+        try {
+            ResourceVO resource = resourceService.store(bytes, name, contentType, uploaderId);
+            return new ImportedImage(name, resource.url(), resource.id());
+        } catch (BusinessException e) {
+            warnings.add("图片上传失败（" + e.getMessage() + "）：" + name);
+            return null;
+        }
+    }
+
+    private byte[] download(String url, List<String> warnings) {
+        try {
+            URI uri = URI.create(url);
+            String host = uri.getHost();
+            if (host == null) {
+                warnings.add("无效图片地址：" + url);
+                return null;
+            }
+            InetAddress address = InetAddress.getByName(host);
+            if (address.isAnyLocalAddress() || address.isLoopbackAddress()
+                    || address.isLinkLocalAddress() || address.isSiteLocalAddress()
+                    || address.isMulticastAddress()) {
+                warnings.add("出于安全原因不下载内网地址：" + url);
+                return null;
+            }
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .followRedirects(HttpClient.Redirect.NEVER)
+                    .build();
+            HttpRequest request = HttpRequest.newBuilder(uri)
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+            HttpResponse<byte[]> response = client.send(request, HttpResponse.BodyHandlers.ofByteArray());
+            if (response.statusCode() != 200) {
+                warnings.add("图片下载失败（HTTP " + response.statusCode() + "）：" + url);
+                return null;
+            }
+            String type = response.headers().firstValue("content-type").orElse("");
+            if (!type.toLowerCase(Locale.ROOT).startsWith("image/")) {
+                warnings.add("地址不是图片：" + url);
+                return null;
+            }
+            return response.body();
+        } catch (Exception e) {
+            warnings.add("图片下载失败：" + url);
+            return null;
+        }
+    }
+
+    // ------------------------------------------------------------ 工具
+
+    private byte[] bytesOf(MultipartFile file, String name) {
+        try {
+            return file.getBytes();
+        } catch (IOException e) {
+            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "读取图片失败：" + name);
+        }
+    }
+
+    private byte[] decodeBase64(String encoded) {
+        try {
+            return Base64.getMimeDecoder().decode(encoded.replaceAll("\\s", ""));
         } catch (IllegalArgumentException e) {
             return null;
         }
     }
 
-    private String replaceRelativeImages(String body, Map<String, String> uploaded, List<String> warnings) {
-        String result = replaceRelativeInMarkdown(body, uploaded, warnings);
-        return replaceRelativeInHtml(result, uploaded, warnings);
-    }
-
-    private String replaceRelativeInMarkdown(String body, Map<String, String> uploaded, List<String> warnings) {
-        Matcher matcher = MD_IMAGE.matcher(body);
-        StringBuilder sb = new StringBuilder();
-        while (matcher.find()) {
-            String target = matcher.group(2);
-            String replacement = matcher.group(0);
-            String url = uploaded.get(baseName(target).toLowerCase(Locale.ROOT));
-            if (url != null) {
-                replacement = "![" + matcher.group(1) + "](" + url + ")";
-            } else if (isLocalReference(target)) {
-                warnings.add("未找到图片文件：" + target);
-            }
-            matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
-        }
-        matcher.appendTail(sb);
-        return sb.toString();
-    }
-
-    private String replaceRelativeInHtml(String body, Map<String, String> uploaded, List<String> warnings) {
-        Matcher matcher = HTML_IMAGE.matcher(body);
-        StringBuilder sb = new StringBuilder();
-        while (matcher.find()) {
-            String target = matcher.group(2);
-            String replacement = matcher.group(0);
-            String url = uploaded.get(baseName(target).toLowerCase(Locale.ROOT));
-            if (url != null) {
-                replacement = matcher.group(1) + url + matcher.group(3);
-            } else if (isLocalReference(target)) {
-                warnings.add("未找到图片文件：" + target);
-            }
-            matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
-        }
-        matcher.appendTail(sb);
-        return sb.toString();
-    }
-
-    private boolean isLocalReference(String target) {
+    private boolean isHttp(String target) {
         String lower = target.toLowerCase(Locale.ROOT);
-        return !lower.startsWith("http://") && !lower.startsWith("https://")
-                && !lower.startsWith("//") && !lower.startsWith("data:")
-                && !lower.startsWith("/uploads/");
+        return lower.startsWith("http://") || lower.startsWith("https://");
     }
 
-    private ImportedImage saveImage(MultipartFile file, byte[] bytes, String ext) {
-        if (bytes.length > MAX_IMAGE_SIZE) {
-            throw BusinessException.badRequest("单张图片不能超过 5MB");
+    private Path toLocalPath(String target) {
+        if (!(target.startsWith("/") || WINDOWS_ABSOLUTE.matcher(target).matches())) {
+            return null;
         }
-        String normalized = ext.toLowerCase(Locale.ROOT);
-        if (!IMAGE_EXT.contains(normalized)) {
-            throw BusinessException.badRequest("不支持的图片类型：" + ext);
-        }
-        if (file != null) {
-            String mime = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
-            if (!mime.startsWith("image/")) {
-                throw BusinessException.badRequest("文件不是图片：" + nameOf(file));
-            }
-        }
-
-        String month = LocalDate.now().format(MONTH);
-        String stored = UUID.randomUUID().toString().replace("-", "") + "." + normalized;
-        Path dir = Paths.get(properties.storage().uploadDir())
-                .toAbsolutePath().normalize()
-                .resolve("markdown")
-                .resolve(month);
         try {
-            Files.createDirectories(dir);
-            Files.write(dir.resolve(stored), bytes, StandardOpenOption.CREATE_NEW);
-        } catch (IOException e) {
-            throw new BusinessException(ErrorCode.INTERNAL_ERROR, "图片保存失败");
+            return Paths.get(target);
+        } catch (InvalidPathException e) {
+            return null;
         }
-        String url = "/uploads/markdown/" + month + "/" + stored;
-        return new ImportedImage(file == null ? stored : nameOf(file), url);
     }
 
-    // ------------------------------------------------------------ 文本解析
+    private String guessMime(String name) {
+        String ext = extension(name);
+        return switch (ext) {
+            case "png" -> "image/png";
+            case "jpg", "jpeg" -> "image/jpeg";
+            case "gif" -> "image/gif";
+            case "webp" -> "image/webp";
+            case "svg" -> "image/svg+xml";
+            default -> "application/octet-stream";
+        };
+    }
 
     private record FrontMatter(Map<String, String> values, String body) {
     }
@@ -319,8 +395,7 @@ public class MarkdownImportService {
             }
             values.put(key, value);
         }
-        String body = text.substring(end + 4);
-        return new FrontMatter(values, body);
+        return new FrontMatter(values, text.substring(end + 4));
     }
 
     private String stripBom(String text) {
@@ -334,7 +409,7 @@ public class MarkdownImportService {
 
     private String nameOf(MultipartFile file) {
         String name = file.getOriginalFilename();
-        return StringUtils.hasText(name) ? Paths.get(name).getFileName().toString() : "image";
+        return StringUtils.hasText(name) ? Paths.get(name.replace('\\', '/')).getFileName().toString() : "image";
     }
 
     private String baseName(String path) {

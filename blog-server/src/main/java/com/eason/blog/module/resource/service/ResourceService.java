@@ -21,6 +21,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -73,12 +74,37 @@ public class ResourceService {
         String original = StringUtils.hasText(file.getOriginalFilename())
                 ? Paths.get(file.getOriginalFilename()).getFileName().toString()
                 : "unnamed";
+        String mime = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        try {
+            return store(file.getBytes(), original, mime, uploaderId);
+        } catch (IOException e) {
+            throw new BusinessException(com.eason.blog.common.exception.ErrorCode.INTERNAL_ERROR, "读取上传文件失败");
+        }
+    }
+
+    /**
+     * 直接保存字节内容并登记到资源表。
+     *
+     * <p>Markdown 导入（base64、绝对路径、远程图片）统一走这里，
+     * 保证导入的图片在「资源管理」里可见、可复用。</p>
+     */
+    @Transactional
+    public ResourceVO store(byte[] bytes, String originalName, String mime, Long uploaderId) {
+        if (bytes == null || bytes.length == 0) {
+            throw BusinessException.badRequest("文件为空");
+        }
+        if (bytes.length > MAX_SIZE) {
+            throw BusinessException.badRequest("文件不能超过 5MB");
+        }
+        String original = StringUtils.hasText(originalName)
+                ? Paths.get(originalName.replace('\\', '/')).getFileName().toString()
+                : "unnamed";
         String ext = extensionOf(original);
         if (!ALLOWED_EXT.contains(ext)) {
             throw BusinessException.badRequest("不支持的文件类型：" + ext);
         }
-        String mime = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
-        if (ALLOWED_MIME_PREFIX.stream().noneMatch(mime::startsWith)) {
+        String normalizedMime = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
+        if (ALLOWED_MIME_PREFIX.stream().noneMatch(normalizedMime::startsWith)) {
             throw BusinessException.badRequest("不支持的文件 MIME 类型");
         }
 
@@ -92,9 +118,7 @@ public class ResourceService {
 
         try {
             Files.createDirectories(dir);
-            try (InputStream in = file.getInputStream()) {
-                Files.copy(in, target, StandardCopyOption.REPLACE_EXISTING);
-            }
+            Files.write(target, bytes, StandardOpenOption.CREATE_NEW);
         } catch (IOException e) {
             throw new BusinessException(com.eason.blog.common.exception.ErrorCode.INTERNAL_ERROR, "文件保存失败");
         }
@@ -105,8 +129,8 @@ public class ResourceService {
         resource.setStoredName(storedName);
         resource.setPath(month + "/" + storedName);
         resource.setUrl("/uploads/" + month + "/" + storedName);
-        resource.setMimeType(mime);
-        resource.setSize(file.getSize());
+        resource.setMimeType(normalizedMime);
+        resource.setSize((long) bytes.length);
         resource.setSha256(sha256(target));
         resource.setCreateTime(LocalDateTime.now());
         resource.setIsDeleted(0);

@@ -96,9 +96,16 @@ const imported = await evaluate(`(() => {
 })()`)
 record('标题被解析', imported?.title === 'MD 导入验证', JSON.stringify(imported.title))
 record('正文包含上传后的图片地址',
-  imported.images.length === 2 && imported.images.every((i) => i.includes('/uploads/markdown/')),
+  imported.images.length === 2 && imported.images.every((i) => i.includes('/uploads/')),
   JSON.stringify(imported.images))
 record('H1 已从正文移除', !(imported.content ?? '').includes('# 这行标题会被忽略'))
+
+// 导入的图片应进入资源库
+const resources = await call('/api/v1/admin/resources?keyword=shot.png&size=10',
+  { headers: { Cookie: adminCookie } })
+record('图片已登记到资源库',
+  (resources.body?.data?.records ?? []).some((r) => r.originalName === 'shot.png'),
+  JSON.stringify((resources.body?.data?.records ?? []).map((r) => r.originalName)))
 
 // 保存并发布
 const saved = await evaluate(`(async () => {

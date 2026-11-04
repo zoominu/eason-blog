@@ -4,20 +4,25 @@
 
 ---
 
-## 2026-11-04 · 文章导入 Markdown（含图片）
+## 2026-11-04 · 文章导入 Markdown（图片入资源库）
 
 | 需求 | 处理 |
 | --- | --- |
-| 新建文章可直接上传 md，图片一起上传并解析展示 | 新增 `POST /admin/articles/import-markdown`（multipart：md + 多张图片）。服务端解析 front matter / 首个 H1 作为标题，把 base64 内嵌图片解码保存，把相对路径图片按文件名匹配本次上传的文件，统一改写成 `/uploads/markdown/yyyy/MM/xxx` 后返回 Markdown；后台「新建文章」加「导入 MD」按钮，选中 md + 图片后自动填标题/摘要/正文，保存发布后前台直接显示 |
+| 上传 md 时把里面的图片自动上传到资源库并引用（md 用绝对路径） | 导入改为走 `ResourceService.store`，所有图片登记进 `blog_resource`、存 `uploads/yyyy/MM/` 并改写正文引用。支持：http(s) 绝对地址自动下载（拦截内网）、后端可读的绝对路径直接读、读不到时按文件名匹配随 md 选中的图片、base64 内嵌 |
 
 ### 验证
 
 ```
-后端测试  Tests run: 57（新增导入解析用例：front matter、base64、相对路径、缺失图片告警）
-浏览器    scripts/verify-markdown-import.mjs 9/9
+后端测试  Tests run: 57（导入用例改用 Windows 绝对路径匹配，并断言资源库能查到图片）
+浏览器    scripts/verify-markdown-import.mjs 10/10
 ```
 
-实测导入后正文含两个 `/uploads/markdown/...` 地址，发布后前台 `img` 数量 2、`naturalWidth > 0`。
+实测 md 写 `C:\Users\eason\Pictures\shot.png`，随 md 选中 `shot.png` 后正文被改写为
+`/uploads/2026/11/xxxx.png`，`资源管理` 可按 `shot.png` 查到，前台图片 `naturalWidth > 0`。
+
+> 注意：浏览器的安全策略不允许网页直接读取用户磁盘上的绝对路径。所以「绝对路径」要么是
+> http(s) 地址（服务端下载），要么需要把图片和 md 一起选中（按文件名匹配）。
+> 如果后端与 md 在同一台机器上（本地开发），服务端会直接读取该路径。
 
 ---
 

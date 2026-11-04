@@ -82,10 +82,11 @@ public class AdminArticleController {
     @PostMapping(value = "/import-markdown", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
     @Audit(module = "article", action = "导入 Markdown")
     public ApiResponse<com.eason.blog.module.article.service.MarkdownImportService.ImportResult> importMarkdown(
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam("file") org.springframework.web.multipart.MultipartFile file,
             @RequestParam(value = "images", required = false)
             java.util.List<org.springframework.web.multipart.MultipartFile> images) {
-        return ApiResponse.success(markdownImportService.importMarkdown(file, images));
+        return ApiResponse.success(markdownImportService.importMarkdown(file, images, principal.getId()));
     }
 
     @PostMapping("/{id}/publish")    @Audit(module = "article", action = "发布文章")

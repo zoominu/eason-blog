@@ -227,7 +227,8 @@ watch(
           <el-form-item label="正文" required>
             <MarkdownEditor v-model="form.content" />
             <p class="hint">
-              支持「导入 MD」：选择 .md 时可一并选中其中的图片，导入后图片会自动上传并改写引用。
+              支持「导入 MD」：md 里的图片若是 http(s) 绝对地址会自动下载进资源库；
+              本地绝对路径的图片请与 md 一起选中，导入时会按文件名匹配并上传到资源库。
             </p>
           </el-form-item>
         </el-form>

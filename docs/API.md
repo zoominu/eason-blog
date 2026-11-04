@@ -344,9 +344,14 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 导入规则：
 
 - 支持 YAML front matter（`title` / `slug` / `summary` / `cover`），没有 title 时取正文第一个 `# 标题`，并把该行从正文移除；
-- 正文中的 base64 内嵌图片（`data:image/...;base64,...`）会解码保存；
-- 正文里的相对图片路径按**文件名**匹配本次一起上传的图片，找不到会在 `warnings` 里列出；
-- 图片存入 `uploads/markdown/yyyy/MM/`，单张 ≤5MB，一次最多 30 张；返回的 `content` 已替换为 `/uploads/...` 地址。
+- 正文中的图片会**统一收进资源库**（`blog_resource`，存 `uploads/yyyy/MM/`），并改写为 `/uploads/...`；
+- 图片引用支持四种来源：
+  1. base64 内嵌（`data:image/...;base64,...`）；
+  2. http(s) 绝对地址：服务端下载后入库（拦截内网/回环地址，单张 ≤5MB）；
+  3. 本机绝对路径：后端能读到该路径时直接读取（本地开发场景）；
+  4. 后端读不到时按**文件名**匹配随 md 一起上传的图片；
+- 仍然找不到的图片会保留原引用，并在 `warnings` 里列出；
+- 一次最多 30 张，单张 ≤5MB。
 
 批量审核：`POST /admin/comments/batch`、`POST /admin/guestbook/batch`，
 body `{ "ids": [1,2,3], "approve": true }`，返回 `{ "updated": n }`。

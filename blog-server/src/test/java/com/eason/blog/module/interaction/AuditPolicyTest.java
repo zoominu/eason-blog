@@ -282,7 +282,7 @@ class AuditPolicyTest {
         String base64 = java.util.Base64.getEncoder().encodeToString(png);
         String md = "---\ntitle: 导入测试\nslug: import-test\nsummary: 摘要\n---\n\n"
                 + "![内嵌](data:image/png;base64," + base64 + ")\n\n"
-                + "![相对](./pics/a.png)\n\n"
+                + "![绝对路径](C:\\\\Users\\\\eason\\\\Pictures\\\\a.png)\n\n"
                 + "![缺失](./pics/missing.png)\n";
         MockMultipartFile mdFile = new MockMultipartFile("file", "post.md", "text/markdown",
                 md.getBytes(java.nio.charset.StandardCharsets.UTF_8));
@@ -294,11 +294,17 @@ class AuditPolicyTest {
                 .andExpect(jsonPath("$.data.title").value("导入测试"))
                 .andExpect(jsonPath("$.data.slug").value("import-test"))
                 .andExpect(jsonPath("$.data.content")
-                        .value(org.hamcrest.Matchers.containsString("/uploads/markdown/")))
+                        .value(org.hamcrest.Matchers.containsString("/uploads/")))
                 .andExpect(jsonPath("$.data.images.length()").value(2))
                 .andExpect(jsonPath("$.data.warnings.length()").value(1))
                 .andExpect(jsonPath("$.data.warnings[0]")
                         .value(org.hamcrest.Matchers.containsString("missing.png")));
+
+        // 导入的图片会登记到资源库
+        mockMvc.perform(get("/api/v1/admin/resources?keyword=a.png&size=10").cookie(adminCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.records[0].url")
+                        .value(org.hamcrest.Matchers.startsWith("/uploads/")));
     }
 
     @Test
