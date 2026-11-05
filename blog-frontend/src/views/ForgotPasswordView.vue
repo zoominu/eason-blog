@@ -45,8 +45,7 @@ async function submit() {
       <template v-else>
         <p class="ok">如果该邮箱已注册，重置链接已发送。</p>
         <p class="muted">
-          本地开发默认未配置 SMTP，邮件内容会打印在后端日志里，搜索
-          <code>reset-password?token=</code> 即可拿到链接。
+          请查收邮件并点击其中的重置链接（30 分钟内有效）。没收到的话，请检查垃圾邮件或稍后重试。
         </p>
         <RouterLink to="/login" class="btn wide">返回登录</RouterLink>
       </template>

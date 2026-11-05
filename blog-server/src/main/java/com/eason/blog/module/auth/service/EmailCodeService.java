@@ -52,8 +52,11 @@ public class EmailCodeService {
         entity.setCreateTime(LocalDateTime.now());
         emailCodeMapper.insert(entity);
 
-        mailService.sendStrict(email, "邮箱验证码",
-                "你的验证码是 " + code + "，" + VALID_MINUTES + " 分钟内有效。若非本人操作请忽略。");
+        mailService.sendStrict(email, "邮箱验证码", mailService.render(
+                "mail.template.register-code",
+                "你的注册验证码是 {code}，{minutes} 分钟内有效。\n\n{site}",
+                java.util.Map.of("code", code, "minutes", String.valueOf(VALID_MINUTES),
+                        "site", mailService.siteUrl())));
     }
 
     @Transactional

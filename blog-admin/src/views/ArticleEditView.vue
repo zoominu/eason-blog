@@ -6,6 +6,7 @@ import { ArrowLeft, Check, Promotion } from '@element-plus/icons-vue'
 import { articleApi, categoryApi, resourceApi, tagApi } from '@/api'
 import type { ArticleStatus, Category, Tag } from '@/api/types'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import CoverCropper from '@/components/CoverCropper.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -126,8 +127,10 @@ async function back() {
 const coverInput = ref<HTMLInputElement | null>(null)
 const coverUploading = ref(false)
 const coverPercent = ref(0)
+const cropperVisible = ref(false)
+const cropperFile = ref<File | null>(null)
 
-async function onCoverChange(event: Event) {
+function onCoverChange(event: Event) {
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
@@ -136,6 +139,11 @@ async function onCoverChange(event: Event) {
     ElMessage.warning('请选择图片文件')
     return
   }
+  cropperFile.value = file
+  cropperVisible.value = true
+}
+
+async function onCoverCropped(file: File) {
   coverUploading.value = true
   coverPercent.value = 0
   try {
@@ -327,7 +335,7 @@ watch(
                     :stroke-width="6"
                     style="width: 160px"
                   />
-                  <p class="hint">建议 16:9，上传后自动填入图片地址</p>
+                  <p class="hint">上传后可拖动/缩放选择 16:9 展示区域</p>
                 </div>
                 <input
                   ref="coverInput"
@@ -349,6 +357,8 @@ watch(
         </el-card>
       </aside>
     </div>
+
+    <CoverCropper v-model="cropperVisible" :file="cropperFile" @confirm="onCoverCropped" />
   </div>
 </template>
 

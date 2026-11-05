@@ -210,15 +210,11 @@ public class AuthServiceImpl implements AuthService {
             return;
         }
         String token = emailTokenService.create(user.getId(), EmailTokenService.TYPE_RESET);
-        String link = properties.mail().siteUrl() + "/reset-password?token=" + token;
-        mailService.send(user.getEmail(), "重置 Eason Blog 密码", """
-                你好 %s：
-
-                点击下面的链接重置密码（30 分钟内有效，仅可使用一次）：
-                %s
-
-                如果不是你本人操作，请忽略这封邮件。
-                """.formatted(user.getNickname(), link));
+        String link = mailService.siteUrl() + "/reset-password?token=" + token;
+        mailService.send(user.getEmail(), "重置 Eason Blog 密码", mailService.render(
+                "mail.template.reset",
+                "你好 {name}：\n\n点击下面的链接重置密码（30 分钟内有效）：\n{link}\n\n如果不是你本人操作，请忽略这封邮件。\n\n{site}",
+                java.util.Map.of("name", user.getNickname(), "link", link, "site", mailService.siteUrl())));
     }
 
     @Override
@@ -257,15 +253,11 @@ public class AuthServiceImpl implements AuthService {
 
     private void sendVerificationEmail(User user) {
         String token = emailTokenService.create(user.getId(), EmailTokenService.TYPE_VERIFY);
-        String link = properties.mail().siteUrl() + "/verify-email?token=" + token;
-        mailService.send(user.getEmail(), "验证你的 Eason Blog 邮箱", """
-                你好 %s：
-
-                点击下面的链接完成邮箱验证（24 小时内有效）：
-                %s
-
-                如果这不是你本人注册，请忽略这封邮件。
-                """.formatted(user.getNickname(), link));
+        String link = mailService.siteUrl() + "/verify-email?token=" + token;
+        mailService.send(user.getEmail(), "验证你的 Eason Blog 邮箱", mailService.render(
+                "mail.template.verify",
+                "你好 {name}：\n\n点击下面的链接完成邮箱验证（24 小时内有效）：\n{link}\n\n{site}",
+                java.util.Map.of("name", user.getNickname(), "link", link, "site", mailService.siteUrl())));
     }
 
     private String truncateIp(String ip) {

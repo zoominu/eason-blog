@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { UploadFilled } from '@element-plus/icons-vue'
+import { UploadFilled, VideoPlay } from '@element-plus/icons-vue'
 import { resourceApi } from '@/api'
 import type { ResourceItem, ResourceRef } from '@/api/types'
 import { formatDateTime } from '@/utils/format'
@@ -44,6 +44,14 @@ async function openRefs(item: ResourceItem) {
 
 function statusText(status: number) {
   return { 0: '草稿', 1: '已发布', 2: '已下线' }[status] ?? '未知'
+}
+
+const previewVisible = ref(false)
+const previewItem = ref<ResourceItem | null>(null)
+
+function openPreview(item: ResourceItem) {
+  previewItem.value = item
+  previewVisible.value = true
 }
 
 function sizeText(bytes: number) {
@@ -157,17 +165,17 @@ onMounted(load)
           @keyup.enter="load"
           @clear="load"
         />
+        <el-select v-model="query.type" placeholder="全部类型" clearable style="width: 140px" @change="() => { query.page = 1; load() }">
+          <el-option v-for="(meta, key) in TYPE_META" :key="key" :label="meta.label" :value="key" />
+        </el-select>
         <el-button @click="load">查询</el-button>
         <el-progress
           v-if="uploading"
           :percentage="uploadPercent"
           :stroke-width="8"
-          style="width: 200px"
+          style="width: 220px"
+          class="upload-progress"
         />
-        <span v-if="uploading" class="muted">上传中 {{ uploadPercent }}%</span>
-        <el-select v-model="query.type" placeholder="全部类型" clearable style="width: 140px" @change="() => { query.page = 1; load() }">
-          <el-option v-for="(meta, key) in TYPE_META" :key="key" :label="meta.label" :value="key" />
-        </el-select>
         <span class="muted total">共 {{ total }} 个文件</span>
       </div>
 
@@ -177,9 +185,21 @@ onMounted(load)
 
       <div v-else v-loading="loading" class="grid">
         <div v-for="item in list" :key="item.id" class="card-item">
-          <div class="thumb">
+          <div class="thumb" @click="openPreview(item)">
             <img v-if="item.mimeType.startsWith('image/')" :src="item.url" :alt="item.originalName" />
-            <span v-else class="thumb__ext">{{ item.originalName.split('.').pop()?.toUpperCase() }}</span>
+            <video
+              v-else-if="item.mimeType.startsWith('video/')"
+              :src="item.url"
+              preload="metadata"
+              muted
+              class="thumb__video"
+            />
+            <div v-if="item.mimeType.startsWith('video/') || item.mimeType.startsWith('audio/')" class="thumb__play">
+              <el-icon :size="26"><VideoPlay /></el-icon>
+            </div>
+            <span v-else-if="!item.mimeType.startsWith('image/')" class="thumb__ext">
+              {{ item.originalName.split('.').pop()?.toUpperCase() }}
+            </span>
           </div>
           <div class="meta">
             <span class="meta__name" :title="item.originalName">{{ item.originalName }}</span>
@@ -224,6 +244,40 @@ onMounted(load)
             </el-tag>
           </li>
         </ul>
+      </div>
+    </el-dialog>
+
+    <el-dialog
+      v-model="previewVisible"
+      :title="previewItem?.originalName ?? '预览'"
+      width="760px"
+      destroy-on-close
+    >
+      <div v-if="previewItem" class="preview">
+        <img
+          v-if="previewItem.mimeType.startsWith('image/')"
+          :src="previewItem.url"
+          :alt="previewItem.originalName"
+          class="preview__image"
+        />
+        <video
+          v-else-if="previewItem.mimeType.startsWith('video/')"
+          :src="previewItem.url"
+          controls
+          autoplay
+          class="preview__media"
+        />
+        <audio
+          v-else-if="previewItem.mimeType.startsWith('audio/')"
+          :src="previewItem.url"
+          controls
+          autoplay
+          class="preview__audio"
+        />
+        <div v-else class="preview__file">
+          <p class="muted">该类型不支持在线预览</p>
+          <el-button type="primary" tag="a" :href="previewItem.url" target="_blank">打开文件</el-button>
+        </div>
       </div>
     </el-dialog>
   </div>
@@ -276,6 +330,62 @@ onMounted(load)
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.thumb {
+  cursor: pointer;
+}
+
+.thumb__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumb__play {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+}
+
+.preview__image {
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 8px;
+}
+
+.preview__media {
+  width: 100%;
+  max-height: 70vh;
+  border-radius: 8px;
+  background: #000;
+}
+
+.preview__audio {
+  width: 100%;
+}
+
+.preview__file {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-progress {
+  margin-left: 4px;
 }
 
 .grid {

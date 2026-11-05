@@ -85,6 +85,7 @@ function isMultiline(item: SystemConfigItem) {
   return (
     item.key === 'share.template' ||
     item.key === 'audit.banned-words' ||
+    item.key.startsWith('mail.template.') ||
     (item.description ?? '').includes('模板')
   )
 }

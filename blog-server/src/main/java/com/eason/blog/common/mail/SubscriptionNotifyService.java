@@ -38,7 +38,9 @@ public class SubscriptionNotifyService {
         }
         String link = mailService.siteUrl() + "/article/" + article.getSlug();
         String subject = "新文章：" + article.getTitle();
-        String body = "发布了新文章《" + article.getTitle() + "》\n\n" + link + "\n\n如果不想再收到，可在个人中心关闭订阅。";
+        String body = mailService.render("mail.template.subscription",
+                "发布了新文章《{title}》\n\n{link}\n\n如果不想再收到，可在个人中心关闭订阅。\n\n{site}",
+                java.util.Map.of("title", article.getTitle(), "link", link, "site", mailService.siteUrl()));
         for (Subscription sub : subs) {
             try {
                 mailService.send(sub.getEmail(), subject, body);

@@ -39,6 +39,16 @@ public class MailService {
         return StringUtils.hasText(url) ? url.replaceAll("/+$", "") : "http://localhost";
     }
 
+    /** 从系统设置读模板并替换占位符；模板不存在时用 fallback。 */
+    public String render(String templateKey, String fallback, java.util.Map<String, String> vars) {
+        String template = config(templateKey, "");
+        String body = StringUtils.hasText(template) ? template : fallback;
+        for (var entry : vars.entrySet()) {
+            body = body.replace("{" + entry.getKey() + "}", entry.getValue() == null ? "" : entry.getValue());
+        }
+        return body;
+    }
+
     /** 发送失败只记日志，不影响业务（注册、发布等）。 */
     public void send(String to, String subject, String body) {
         try {

@@ -380,6 +380,17 @@ MIME 需匹配对应类型；存储名随机（UUID），原始文件名只入�
 `mail.username`、`mail.password`（**授权码**）、`mail.from`、`mail.ssl`、`site.url`。
 开启 `mail.enabled=true` 后，注册必须邮箱验证码；文章发布时会给订阅用户群发（最多 100 人）。
 
+邮件模板同样在设置里改，占位符：
+
+| key | 占位符 |
+| --- | --- |
+| `mail.template.register-code` | `{code}` `{minutes}` `{site}` |
+| `mail.template.reset` | `{name}` `{link}` `{site}` |
+| `mail.template.verify` | `{name}` `{link}` `{site}` |
+| `mail.template.subscription` | `{title}` `{link}` `{site}` |
+
+`site.url` 必须是站点对外地址（如 `http://39.96.94.89`），否则邮件里的链接会是 localhost。
+
 后台列表（评论/留言/用户/日志/资源/文章）单页上限 100，公开接口仍为 50。
 
 批量审核：`POST /admin/comments/batch`、`POST /admin/guestbook/batch`，

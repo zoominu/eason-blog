@@ -341,20 +341,6 @@ async function logout() {
 }
 
 const verifyHint = ref('')
-const sendingVerify = ref(false)
-
-async function resendVerification() {
-  sendingVerify.value = true
-  verifyHint.value = ''
-  try {
-    await authApi.resendVerification()
-    verifyHint.value = '验证邮件已发送（开发环境请看后端日志）'
-  } catch (e) {
-    verifyHint.value = (e as Error).message
-  } finally {
-    sendingVerify.value = false
-  }
-}
 
 onMounted(async () => {
   await userStore.fetchMe()
@@ -391,18 +377,6 @@ watch(
       <h1>个人中心</h1>
       <p class="muted" v-if="userStore.user">
         {{ userStore.user.email }} · 注册于 {{ formatDate(userStore.user.registerTime) }}
-      </p>
-      <p v-if="userStore.user" class="verify">
-        <template v-if="userStore.user.emailVerified">
-          <span class="ok">邮箱已验证</span>
-        </template>
-        <template v-else>
-          <span class="warn">邮箱未验证</span>
-          <button class="link-btn" :disabled="sendingVerify" @click="resendVerification">
-            {{ sendingVerify ? '发送中…' : '发送验证邮件' }}
-          </button>
-        </template>
-        <span v-if="verifyHint" class="muted hint">{{ verifyHint }}</span>
       </p>
     </header>
 
