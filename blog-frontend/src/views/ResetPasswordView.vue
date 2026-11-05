@@ -38,8 +38,10 @@ async function submit() {
 </script>
 
 <template>
-  <div class="container narrow">
-    <div class="card panel">
+  <div class="auth-page">
+    <div class="auth-bg" aria-hidden="true" />
+    <div class="container narrow auth">
+      <div class="card panel">
       <h1>重置密码</h1>
       <p v-if="done" class="ok">密码已重置，即将跳转到登录页…</p>
       <form v-else @submit.prevent="submit">
@@ -58,13 +60,14 @@ async function submit() {
         </button>
       </form>
     </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .narrow {
   max-width: 460px;
-  padding-top: 40px;
+  margin: 0 auto;
 }
 
 .panel {

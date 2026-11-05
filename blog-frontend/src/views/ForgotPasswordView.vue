@@ -24,10 +24,12 @@ async function submit() {
 </script>
 
 <template>
-  <div class="container narrow">
-    <RouterLink to="/login" class="back"><ArrowLeft :size="15" /> 返回登录</RouterLink>
+  <div class="auth-page">
+    <div class="auth-bg" aria-hidden="true" />
+    <div class="container narrow auth">
+      <RouterLink to="/login" class="back"><ArrowLeft :size="15" /> 返回登录</RouterLink>
 
-    <div class="card panel">
+      <div class="card panel">
       <h1>找回密码</h1>
       <template v-if="!sent">
         <p class="muted">输入注册邮箱，我们会发送一封包含重置链接的邮件（30 分钟内有效）。</p>
@@ -50,12 +52,14 @@ async function submit() {
         <RouterLink to="/login" class="btn wide">返回登录</RouterLink>
       </template>
     </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .narrow {
   max-width: 460px;
+  margin: 0 auto;
 }
 
 .back {

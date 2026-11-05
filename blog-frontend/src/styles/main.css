@@ -193,34 +193,39 @@ a {
   font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
 }
 
-/* 登录/注册页：随机壁纸背景（paugram API 会 302 到实际图片） */
+/* 登录/注册/找回密码：纯白底 + 右侧随机壁纸，无遮罩 */
 .auth-page {
   position: relative;
-  min-height: calc(100vh - 72px);
+  min-height: calc(100vh - 128px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 16px;
+  padding: 24px 16px;
   overflow: hidden;
+  background: #fff;
+  /* 认证页固定浅色，避免深色主题下白卡片配浅字 */
+  --bg: #fff;
+  --card: #fff;
+  --fg: #111827;
+  --fg-soft: #4b5563;
+  --border: #e5e7eb;
+  --muted: #6b7280;
 }
 
 .auth-bg {
   position: absolute;
   inset: 0;
-  background-color: #1a1d24;
+  background-color: #fff;
   background-image: url('https://api.paugram.com/wallpaper/?source=gt');
   background-size: cover;
-  background-position: center;
-  filter: brightness(0.55) saturate(1.05);
-  transform: scale(1.02);
+  background-position: right center;
+  background-repeat: no-repeat;
 }
 
-.auth-page::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(180deg, rgba(8, 10, 16, 0.35), rgba(8, 10, 16, 0.15));
-  pointer-events: none;
+@media (max-width: 720px) {
+  .auth-bg {
+    background-position: center;
+  }
 }
 
 .auth-page > .auth {
@@ -230,17 +235,8 @@ a {
 }
 
 .auth-page .card {
-  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
-}
-
-[data-theme='light'] .auth-page .card {
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(8px);
-}
-
-[data-theme='dark'] .auth-page .card {
-  background: rgba(24, 26, 32, 0.92);
-  backdrop-filter: blur(8px);
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(17, 24, 39, 0.16);
 }
 
 .prose-blog pre {
