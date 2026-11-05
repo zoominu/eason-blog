@@ -57,7 +57,8 @@ class AuthApiTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value(200))
                 .andExpect(jsonPath("$.data.email").value(email))
-                .andExpect(jsonPath("$.data.nickname").value("测试读者"))
+                .andExpect(jsonPath("$.data.username").value(email.substring(0, email.indexOf('@'))))
+                .andExpect(jsonPath("$.data.nickname").value(email.substring(0, email.indexOf('@'))))
                 .andExpect(jsonPath("$.data.roles[0]").value("USER"));
 
         Cookie cookie = login(email, PASSWORD);
@@ -81,7 +82,7 @@ class AuthApiTest {
                                 {"email":"%s","password":"totally-wrong"}
                                 """.formatted(email)))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.message").value("邮箱或密码错误"));
+                .andExpect(jsonPath("$.message").value("账号或密码错误"));
     }
 
     @Test

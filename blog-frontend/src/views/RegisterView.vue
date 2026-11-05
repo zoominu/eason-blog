@@ -8,8 +8,8 @@ import { useUserStore } from '@/stores/user'
 const router = useRouter()
 const userStore = useUserStore()
 
+const username = ref('')
 const email = ref('')
-const nickname = ref('')
 const password = ref('')
 const confirm = ref('')
 const code = ref('')
@@ -44,6 +44,14 @@ const passwordValid = computed(() => password.value.length >= 8 && /[A-Za-z]/.te
 
 async function submit() {
   error.value = ''
+  if (!username.value.trim()) {
+    error.value = '请输入账号名'
+    return
+  }
+  if (!/^[\w\u4e00-\u9fa5-]{2,30}$/.test(username.value.trim())) {
+    error.value = '账号名需为 2-30 位字母、数字、下划线或中文'
+    return
+  }
   if (!email.value.trim()) {
     error.value = '请输入邮箱'
     return
@@ -64,13 +72,13 @@ async function submit() {
   loading.value = true
   try {
     await userStore.register({
+      username: username.value.trim(),
       email: email.value.trim(),
       password: password.value,
-      nickname: nickname.value.trim() || undefined,
       code: code.value.trim() || undefined
     })
     // 注册成功后直接登录，减少一次手动操作
-    await userStore.login(email.value.trim(), password.value)
+    await userStore.login(username.value.trim(), password.value)
     router.replace('/')
   } catch (e) {
     error.value = (e as Error).message
@@ -85,12 +93,17 @@ async function submit() {
     <div class="container auth">
       <div class="card panel">
         <h1>注册</h1>
-        <p class="muted">注册后可以评论、收藏和留言，我们会发一封验证邮件。</p>
+        <p class="muted">注册后可以评论、收藏和留言；账号名站内唯一且不可修改。</p>
 
       <form class="form" @submit.prevent="submit">
         <label class="field">
+          <span>账号</span>
+          <input v-model="username" type="text" maxlength="30" placeholder="2-30 位字母/数字/下划线/中文，注册后不可修改" />
+        </label>
+
+        <label class="field">
           <span>邮箱</span>
-          <input v-model="email" type="email" autocomplete="email" placeholder="you@example.com" />
+          <input v-model="email" type="email" autocomplete="email" placeholder="用于验证、订阅和找回密码" />
         </label>
 
         <label class="field">
@@ -101,11 +114,6 @@ async function submit() {
               {{ countdown > 0 ? `${countdown}s` : sending ? '发送中…' : '发送验证码' }}
             </button>
           </div>
-        </label>
-
-        <label class="field">
-          <span>昵称（可选）</span>
-          <input v-model="nickname" type="text" maxlength="50" placeholder="展示名称" />
         </label>
 
         <label class="field">

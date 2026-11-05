@@ -75,8 +75,10 @@ public class AuthController {
         // 同一 IP 每分钟最多 10 次登录尝试，防撞库；真实用户正常操作远低于该阈值
         // 两级限流：单 IP 总闸 + 单账号（IP+邮箱）防撞库
         String ip = clientIp(httpRequest);
+        String identifier = request.account() != null && !request.account().isBlank()
+                ? request.account().trim() : (request.email() == null ? "" : request.email().trim());
         rateLimiter.check("login-ip:" + ip, 60, 60);
-        rateLimiter.check("login-account:" + ip + ":" + request.email().toLowerCase(), 10, 60);
+        rateLimiter.check("login-account:" + ip + ":" + identifier.toLowerCase(), 10, 60);
 
         LoginResult result = authService.login(request, ip);
         writeAuthCookie(httpResponse, result.token(), Duration.ofMinutes(jwtService.expireMinutes()));

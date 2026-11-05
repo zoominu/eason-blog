@@ -11,13 +11,10 @@ const userStore = useUserStore()
 
 const formRef = ref<FormInstance>()
 const loading = ref(false)
-const form = reactive({ email: '', password: '' })
+const form = reactive({ account: '', password: '' })
 
 const rules: FormRules = {
-  email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '邮箱格式不正确', trigger: 'blur' }
-  ],
+  account: [{ required: true, message: '请输入账号', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 }
 
@@ -28,7 +25,7 @@ async function submit() {
 
   loading.value = true
   try {
-    const user = await userStore.login(form.email.trim(), form.password)
+    const user = await userStore.login(form.account.trim(), form.password)
     if (!user.roles.includes('SUPER_ADMIN')) {
       ElMessage.error('该账号不是管理员')
       await userStore.logout()
@@ -56,8 +53,8 @@ async function submit() {
       <p class="muted">仅站点管理员可访问</p>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent="submit">
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="form.email" placeholder="you@example.com" size="large" />
+        <el-form-item label="账号" prop="account">
+          <el-input v-model="form.account" placeholder="管理员账号" size="large" />
         </el-form-item>
         <el-form-item label="密码" prop="password">
           <el-input

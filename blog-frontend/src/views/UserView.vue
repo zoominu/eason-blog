@@ -18,7 +18,6 @@ const notifStore = useNotificationStore()
 type Tab = 'profile' | 'favorites' | 'likes' | 'comments' | 'notifications'
 const tab = ref<Tab>('profile')
 
-const nickname = ref('')
 const bio = ref('')
 const saving = ref(false)
 const message = ref('')
@@ -306,7 +305,7 @@ async function saveProfile() {
   message.value = ''
   error.value = ''
   try {
-    const updated = await authApi.updateProfile({ nickname: nickname.value, bio: bio.value })
+    const updated = await authApi.updateProfile({ bio: bio.value })
     userStore.user = updated
     message.value = '资料已更新'
   } catch (e) {
@@ -344,7 +343,6 @@ const verifyHint = ref('')
 
 onMounted(async () => {
   await userStore.fetchMe()
-  nickname.value = userStore.user?.nickname ?? ''
   bio.value = userStore.user?.bio ?? ''
   await loadSubscription()
 
@@ -422,8 +420,8 @@ watch(
           </div>
         </div>
         <label class="field">
-          <span>昵称</span>
-          <input v-model="nickname" maxlength="50" />
+          <span>账号（不可修改）</span>
+          <input :value="userStore.user?.username || userStore.user?.nickname" disabled />
         </label>
         <label class="field">
           <span>简介</span>

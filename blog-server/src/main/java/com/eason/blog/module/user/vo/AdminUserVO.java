@@ -8,6 +8,7 @@ public record AdminUserVO(
         Long id,
         String uid,
         String email,
+        String username,
         String nickname,
         String avatar,
         String bio,

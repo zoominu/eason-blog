@@ -22,6 +22,8 @@ public class User {
 
     private String uid;
     private String email;
+    /** 站内唯一账号名，注册后不可修改 */
+    private String username;
     private String password;
     private String nickname;
     private String avatar;

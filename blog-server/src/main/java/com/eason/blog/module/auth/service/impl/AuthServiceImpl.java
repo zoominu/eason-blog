@@ -86,16 +86,23 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public LoginResult login(LoginRequest request, String clientIp) {
+        String identifier = StringUtils.hasText(request.account()) ? request.account().trim()
+                : (request.email() == null ? "" : request.email().trim());
+        // 账号名优先；含 @ 视为邮箱登录（兼容旧账号与管理员）
+        User loginUser = identifier.contains("@")
+                ? userService.getByEmail(identifier.toLowerCase())
+                : userService.getByUsername(identifier);
+        String authEmail = loginUser != null ? loginUser.getEmail() : identifier;
         Authentication authentication;
         try {
             authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(request.email().trim(), request.password()));
+                    new UsernamePasswordAuthenticationToken(authEmail, request.password()));
         } catch (BadCredentialsException ex) {
-            // 不区分"邮箱不存在"和"密码错误"，防止账号枚举
-            recordLogin(null, request.email(), clientIp, 0, "密码错误或账号不存在");
-            throw new BusinessException(ErrorCode.UNAUTHORIZED, "邮箱或密码错误");
+            // 不区分"账号不存在"和"密码错误"，防止账号枚举
+            recordLogin(null, identifier, clientIp, 0, "密码错误或账号不存在");
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "账号或密码错误");
         } catch (DisabledException ex) {
-            recordLogin(null, request.email(), clientIp, 0, "账号已禁用");
+            recordLogin(null, identifier, clientIp, 0, "账号已禁用");
             throw new BusinessException(ErrorCode.FORBIDDEN, "账号已被禁用，请联系管理员");
         }
 
@@ -110,8 +117,8 @@ public class AuthServiceImpl implements AuthService {
 
         String token = jwtService.issue(user.getId(), user.getEmail(), principal.getRoles(),
                 user.getTokenVersion() == null ? 0 : user.getTokenVersion());
-        UserVO vo = new UserVO(user.getId(), user.getUid(), user.getEmail(), user.getNickname(),
-                user.getAvatar(), user.getBio(), principal.getRoles(),
+        UserVO vo = new UserVO(user.getId(), user.getUid(), user.getEmail(), user.getUsername(),
+                user.getNickname(), user.getAvatar(), user.getBio(), principal.getRoles(),
                 user.getEmailVerified() != null && user.getEmailVerified() == 1,
                 user.getRegisterTime());
         return new LoginResult(token, vo);
@@ -152,20 +159,27 @@ public class AuthServiceImpl implements AuthService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-        String nickname = StringUtils.hasText(request.nickname())
-                ? request.nickname().trim()
+        String username = StringUtils.hasText(request.username())
+                ? request.username().trim()
                 : email.substring(0, email.indexOf('@'));
-        // 昵称也走违禁词过滤
-        String hit = auditPolicy.findBannedWord(nickname);
+        if (!username.matches("^[\\w\\u4e00-\\u9fa5-]{2,30}$")) {
+            throw BusinessException.badRequest("账号名需为 2-30 位字母、数字、下划线或中文");
+        }
+        if (userService.getByUsername(username) != null) {
+            throw BusinessException.conflict("账号名已被占用");
+        }
+        // 账号名同时作为展示昵称，也走违禁词过滤
+        String hit = auditPolicy.findBannedWord(username);
         if (hit != null) {
-            throw BusinessException.badRequest("昵称包含违禁词：" + hit);
+            throw BusinessException.badRequest("账号名包含违禁词：" + hit);
         }
 
         User user = new User();
         user.setUid("u" + UUID.randomUUID().toString().replace("-", "").substring(0, 12));
         user.setEmail(email);
+        user.setUsername(username);
         user.setPassword(passwordEncoder.encode(request.password()));
-        user.setNickname(nickname);
+        user.setNickname(username);
         user.setStatus(1);
         user.setEmailVerified(0);
         user.setRegisterTime(now);

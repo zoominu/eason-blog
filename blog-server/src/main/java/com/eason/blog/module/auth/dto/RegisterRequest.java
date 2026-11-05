@@ -22,6 +22,9 @@ public record RegisterRequest(
         @Size(min = 1, max = 50, message = "昵称长度需在 1-50 之间")
         String nickname,
 
+        /** 站内账号名（唯一，不可修改）；不传时用邮箱前缀 */
+        String username,
+
         /** 开启邮件后注册需要邮箱验证码 */
         String code) {
 }

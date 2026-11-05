@@ -12,6 +12,8 @@ public interface UserService {
 
     User getByEmail(String email);
 
+    User getByUsername(String username);
+
     UserVO getProfile(Long id);
 
     UserVO updateProfile(Long id, UpdateProfileRequest request);

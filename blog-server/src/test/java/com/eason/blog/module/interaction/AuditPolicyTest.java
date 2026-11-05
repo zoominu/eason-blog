@@ -298,7 +298,7 @@ class AuditPolicyTest {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"" + UUID.randomUUID().toString().substring(0, 8)
-                                + "@test.local\",\"password\":\"Test123456\",\"nickname\":\"违禁昵称用户\"}"))
+                                + "@test.local\",\"password\":\"Test123456\",\"username\":\"违禁昵称用户\"}"))
                 .andExpect(status().isBadRequest());
     }
 

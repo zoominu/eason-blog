@@ -155,13 +155,13 @@ class AdminUserApiTest {
         mockMvc.perform(patch("/api/v1/admin/users/" + target.getId()).cookie(adminCookie)
                         .contentType("application/json")
                         .content("""
-                                {"email":"%s","nickname":"改过的昵称","bio":"简介"}
+                                {"email":"%s","bio":"简介"}
                                 """.formatted(newEmail)))
                 .andExpect(status().isOk());
 
         User updated = userMapper.selectById(target.getId());
         assertThat(updated.getEmail()).isEqualTo(newEmail);
-        assertThat(updated.getNickname()).isEqualTo("改过的昵称");
+        assertThat(updated.getNickname()).isEqualTo(target.getNickname());
         assertThat(updated.getEmailVerified()).isZero();
 
         // 邮箱与其他账号冲突

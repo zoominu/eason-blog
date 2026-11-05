@@ -46,7 +46,7 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | POST | `/auth/login` | 登录，返回用户信息并写 Cookie | 公开 |
 | POST | `/auth/logout` | 清除 Cookie | 登录 |
 | GET | `/auth/me` | 当前用户 | 登录 |
-| PATCH | `/users/me` | 修改昵称/头像/简介 | 登录 |
+| PATCH | `/users/me` | 修改头像/简介；账号名不可修改 | 登录 |
 | PATCH | `/users/me/password` | 修改密码（校验旧密码，成功后旧 token 全部失效） | 登录 |
 | POST | `/auth/forgot-password` | 发送重置邮件；邮箱不存在也返回 200，防枚举 | 公开（限流） |
 | POST | `/auth/reset-password` | `{token,newPassword}`；token 单次有效，30 分钟过期 | 公开 |
@@ -56,16 +56,22 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 注册请求：
 
 ```json
-{ "email": "reader@example.com", "password": "Passw0rd123", "nickname": "读者" }
+{ "username": "reader", "email": "reader@example.com", "password": "Passw0rd123", "code": "123456" }
 ```
 
-登录失败统一返回 `401 邮箱或密码错误`（不区分账号不存在与密码错误，防枚举）。
+登录用**账号名**（`account`），邮箱只用于验证、订阅和找回密码：
+
+```json
+{ "account": "reader", "password": "Passw0rd123" }
+```
+
+登录失败统一返回 `401 账号或密码错误`（不区分账号不存在与密码错误，防枚举）。
 
 用户对象（`UserVO`）：
 
 ```json
 {
-  "id": 2, "uid": "u9f3c...", "email": "reader@example.com",
+  "id": 2, "uid": "u9f3c...", "email": "reader@example.com", "username": "reader",
   "nickname": "读者", "avatar": null, "bio": null,
   "roles": ["USER"], "registerTime": "2026-11-03T10:00:00"
 }
@@ -272,8 +278,8 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
 | GET | `/admin/users` | 分页；`keyword`（邮箱/昵称）、`status` |
-| POST | `/admin/users` | 新建用户：`{email,password,nickname?,roleIds?}`，不传角色默认 `USER` |
-| PATCH | `/admin/users/{id}` | 修改资料：`{email?,nickname?,avatar?,bio?}`；改邮箱会重置验证状态 |
+| POST | `/admin/users` | 新建用户：`{username?,email,password,nickname?,roleIds?}`，`username` 唯一且不可改；不传角色默认 `USER` |
+| PATCH | `/admin/users/{id}` | 修改资料：`{email?,avatar?,bio?}`；账号名不可修改，改邮箱会重置验证状态 |
 | POST | `/admin/users/{id}/disable` | 禁用（不能禁用自己） |
 | POST | `/admin/users/{id}/enable` | 启用 |
 | PATCH | `/admin/users/{id}/roles` | `{ "roleIds": [1,2] }`；不能移除自己的管理员角色 |
@@ -420,7 +426,7 @@ body `{ "ids": [1,2,3], "approve": true }`，返回 `{ "updated": n }`。
 
 | 接口 | 限制 |
 | --- | --- |
-| `POST /auth/login` | 单 IP 60 次/分；单 IP+邮箱 10 次/分 |
+| `POST /auth/login` | 单 IP 60 次/分；单 IP+账号 10 次/分 |
 | `POST /auth/register` | 单 IP 20 次/时；单邮箱 3 次/时 |
 | `POST /articles/{id}/comments` | 单用户 5 条/分 |
 | `POST /guestbook` | 单用户 3 条/5 分 |

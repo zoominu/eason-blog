@@ -1,11 +1,12 @@
 package com.eason.blog.module.auth.dto;
 
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 
+/**
+ * 登录请求：account 为站内账号名（兼容旧的 email 登录）。
+ */
 public record LoginRequest(
-        @NotBlank(message = "邮箱不能为空")
-        @Email(message = "邮箱格式不正确")
+        String account,
         String email,
 
         @NotBlank(message = "密码不能为空")

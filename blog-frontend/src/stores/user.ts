@@ -24,12 +24,12 @@ export const useUserStore = defineStore('user', {
       }
       return this.user
     },
-    async login(email: string, password: string) {
-      this.user = await authApi.login(email, password)
+    async login(account: string, password: string) {
+      this.user = await authApi.login(account, password)
       this.initialized = true
       return this.user
     },
-    async register(payload: { email: string; password: string; nickname?: string; code?: string }) {
+    async register(payload: { email: string; password: string; username?: string; nickname?: string; code?: string }) {
       return authApi.register(payload)
     },
     async logout() {

@@ -44,7 +44,7 @@ defineProps<{ article: ArticleSummary }>()
 .article-card__cover {
   width: calc(100% + 48px);
   margin: -22px -24px 0;
-  height: 150px;
+  height: 200px;
   overflow: hidden;
   border-radius: 16px 16px 0 0;
   background: var(--bg-soft);

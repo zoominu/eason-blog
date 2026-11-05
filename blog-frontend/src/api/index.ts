@@ -50,8 +50,8 @@ export const siteApi = {
 }
 
 export const authApi = {
-  login: (email: string, password: string) => post<User>('/auth/login', { email, password }),
-  register: (payload: { email: string; password: string; nickname?: string; code?: string }) =>
+  login: (account: string, password: string) => post<User>('/auth/login', { account, password }),
+  register: (payload: { email: string; password: string; username?: string; nickname?: string; code?: string }) =>
     post<User>('/auth/register', payload),
   sendEmailCode: (email: string) => post<void>('/auth/email-code', { email }),
   logout: () => post<void>('/auth/logout'),

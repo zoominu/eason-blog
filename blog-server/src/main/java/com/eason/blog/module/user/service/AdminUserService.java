@@ -81,7 +81,8 @@ public class AdminUserService {
         Page<User> page = new Page<>(Math.max(pageNo, 1), Math.min(Math.max(size, 1), 100));
         userMapper.selectPage(page, wrapper);
         return PageResult.of(page, u -> new AdminUserVO(
-                u.getId(), u.getUid(), u.getEmail(), u.getNickname(), u.getAvatar(), u.getBio(), u.getStatus(),
+                u.getId(), u.getUid(), u.getEmail(), u.getUsername(), u.getNickname(), u.getAvatar(), u.getBio(),
+                u.getStatus(),
                 userRoleMapper.selectRoleCodesByUserId(u.getId()),
                 u.getRegisterTime(), u.getLastLoginTime(), u.getLastLoginIp()));
     }
@@ -104,14 +105,29 @@ public class AdminUserService {
         user.setUid(UUID.randomUUID().toString().replace("-", "").substring(0, 12));
         user.setEmail(email);
         user.setPassword(passwordEncoder.encode(request.password()));
-        String nickname = StringUtils.hasText(request.nickname())
-                ? request.nickname().trim()
-                : email.substring(0, email.indexOf('@'));
-        String hitNickname = auditPolicy.findBannedWord(nickname);
-        if (hitNickname != null) {
-            throw BusinessException.badRequest("昵称包含违禁词：" + hitNickname);
+        String username = StringUtils.hasText(request.username())
+                ? request.username().trim()
+                : (StringUtils.hasText(request.nickname())
+                    ? request.nickname().trim()
+                    : email.substring(0, email.indexOf('@')));
+        if (!username.matches("^[\\w\\u4e00-\\u9fa5-]{2,30}$")) {
+            throw BusinessException.badRequest("账号名需为 2-30 位字母、数字、下划线或中文");
         }
-        user.setNickname(nickname);
+        Long usernameExists = userMapper.selectCount(Wrappers.<User>lambdaQuery().eq(User::getUsername, username));
+        if (usernameExists != null && usernameExists > 0) {
+            // 未显式指定账号名时自动加后缀，避免后台创建撞名
+            if (!StringUtils.hasText(request.username())) {
+                username = username + "_" + UUID.randomUUID().toString().substring(0, 4);
+            } else {
+                throw BusinessException.conflict("账号名已被占用");
+            }
+        }
+        String hitNickname = auditPolicy.findBannedWord(username);
+        if (hitNickname != null) {
+            throw BusinessException.badRequest("账号名包含违禁词：" + hitNickname);
+        }
+        user.setUsername(username);
+        user.setNickname(username);
         user.setStatus(1);
         user.setEmailVerified(0);
         user.setTokenVersion(0);
@@ -171,14 +187,13 @@ public class AdminUserService {
         }
         if (request.nickname() != null) {
             if (!StringUtils.hasText(request.nickname())) {
-                throw BusinessException.badRequest("昵称不能为空");
+                throw BusinessException.badRequest("账号名不能为空");
             }
             String nickname = request.nickname().trim();
-            String hit = auditPolicy.findBannedWord(nickname);
-            if (hit != null) {
-                throw BusinessException.badRequest("昵称包含违禁词：" + hit);
+            // 账号名站内唯一且注册后不可修改
+            if (!nickname.equals(user.getUsername())) {
+                throw BusinessException.badRequest("账号名不可修改");
             }
-            user.setNickname(nickname);
         }
         if (request.avatar() != null) {
             user.setAvatar(request.avatar().trim());

@@ -22,7 +22,7 @@ import type {
 } from './types'
 
 export const authApi = {
-  login: (email: string, password: string) => post<User>('/auth/login', { email, password }),
+  login: (account: string, password: string) => post<User>('/auth/login', { account, password }),
   logout: () => post<void>('/auth/logout'),
   me: () => get<User>('/auth/me')
 }
@@ -140,7 +140,7 @@ export const userApi = {
   enable: (id: number) => post<void>(`/admin/users/${id}/enable`),
   assignRoles: (id: number, roleIds: number[]) => patch<void>(`/admin/users/${id}/roles`, { roleIds }),
   remove: (id: number) => del<void>(`/admin/users/${id}`),
-  create: (payload: { email: string; password: string; nickname?: string; roleIds?: number[] }) =>
+  create: (payload: { username?: string; email: string; password: string; nickname?: string; roleIds?: number[] }) =>
     post<{ id: number }>('/admin/users', payload),
   update: (id: number, payload: { email?: string; nickname?: string; avatar?: string; bio?: string }) =>
     patch<void>(`/admin/users/${id}`, payload)

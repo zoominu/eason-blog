@@ -75,6 +75,7 @@ export interface User {
   id: number
   uid: string
   email: string
+  username: string
   nickname: string
   avatar?: string | null
   bio?: string | null

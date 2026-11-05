@@ -66,7 +66,7 @@ onMounted(() => {
     <h2>七、联系方式</h2>
     <p>
       如对本协议有疑问，可通过本站留言板或邮箱
-      <a href="mailto:admin@eason.blog">admin@eason.blog</a> 联系站长。
+      <a href="mailto:3446885993@qq.com">3446885993@qq.com</a> 联系站长。
     </p>
   </article>
 </template>

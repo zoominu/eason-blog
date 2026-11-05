@@ -75,6 +75,13 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    public User getByUsername(String username) {
+        return userMapper.selectOne(Wrappers.<User>lambdaQuery()
+                .eq(User::getUsername, username)
+                .last("limit 1"));
+    }
+
+    @Override
     public UserVO getProfile(Long id) {
         return toVO(getById(id));
     }
@@ -83,11 +90,10 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserVO updateProfile(Long id, UpdateProfileRequest request) {
         User user = getById(id);
-        // 只覆盖显式传入的字段，未传字段保持原值（PATCH 语义）
-        if (StringUtils.hasText(request.nickname())) {
-            String nickname = request.nickname().trim();
-            checkNickname(nickname);
-            user.setNickname(nickname);
+        // 账号名即 nickname，站内唯一且不可修改
+        if (StringUtils.hasText(request.nickname())
+                && !request.nickname().trim().equals(user.getUsername())) {
+            throw BusinessException.badRequest("账号名不可修改");
         }
         if (request.avatar() != null) {
             user.setAvatar(request.avatar());
@@ -167,8 +173,8 @@ public class UserServiceImpl implements UserService {
 
     private UserVO toVO(User user) {
         List<String> roles = userRoleMapper.selectRoleCodesByUserId(user.getId());
-        return new UserVO(user.getId(), user.getUid(), user.getEmail(), user.getNickname(),
-                user.getAvatar(), user.getBio(), roles,
+        return new UserVO(user.getId(), user.getUid(), user.getEmail(), user.getUsername(),
+                user.getNickname(), user.getAvatar(), user.getBio(), roles,
                 user.getEmailVerified() != null && user.getEmailVerified() == 1,
                 user.getRegisterTime());
     }

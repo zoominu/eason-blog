@@ -10,6 +10,7 @@ public record UserVO(
         Long id,
         String uid,
         String email,
+        String username,
         String nickname,
         String avatar,
         String bio,

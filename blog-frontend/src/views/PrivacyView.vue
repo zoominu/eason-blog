@@ -86,7 +86,7 @@ onMounted(() => {
     <h2>十、联系我们</h2>
     <p>
       如对本政策或个人信息处理有疑问，可通过本站留言板或邮箱
-      <a href="mailto:admin@eason.blog">admin@eason.blog</a> 联系站长。
+      <a href="mailto:3446885993@qq.com">3446885993@qq.com</a> 联系站长。
     </p>
   </article>
 </template>

@@ -8,20 +8,20 @@ const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 
-const email = ref('')
+const account = ref('')
 const password = ref('')
 const loading = ref(false)
 const error = ref('')
 
 async function submit() {
   error.value = ''
-  if (!email.value || !password.value) {
-    error.value = '请输入邮箱和密码'
+  if (!account.value || !password.value) {
+    error.value = '请输入账号和密码'
     return
   }
   loading.value = true
   try {
-    await userStore.login(email.value.trim(), password.value)
+    await userStore.login(account.value.trim(), password.value)
     const redirect = String(route.query.redirect || '/')
     router.replace(redirect)
   } catch (e) {
@@ -37,12 +37,12 @@ async function submit() {
     <div class="container auth">
       <div class="card panel">
         <h1>登录</h1>
-        <p class="muted">使用邮箱登录，登录后可评论、收藏与留言。</p>
+        <p class="muted">使用账号登录，登录后可评论、收藏与留言。</p>
 
       <form class="form" @submit.prevent="submit">
         <label class="field">
-          <span>邮箱</span>
-          <input v-model="email" type="email" autocomplete="email" placeholder="you@example.com" />
+          <span>账号</span>
+          <input v-model="account" type="text" autocomplete="username" placeholder="你的账号名" />
         </label>
 
         <label class="field">

@@ -22,5 +22,9 @@ public record AdminUserCreateRequest(
         @Size(max = 50, message = "昵称最多 50 字")
         String nickname,
 
+        /** 账号名（唯一，创建后不可修改）；留空用邮箱前缀 */
+        @Size(max = 50)
+        String username,
+
         List<Long> roleIds) {
 }

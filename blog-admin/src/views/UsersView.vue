@@ -88,10 +88,10 @@ async function saveRoles() {
 // ---------------- 新建用户 ----------------
 const createVisible = ref(false)
 const creating = ref(false)
-const createForm = reactive({ email: '', nickname: '', password: '', roleIds: [] as number[] })
+const createForm = reactive({ username: '', email: '', nickname: '', password: '', roleIds: [] as number[] })
 
 function openCreate() {
-  Object.assign(createForm, { email: '', nickname: '', password: '', roleIds: [] })
+  Object.assign(createForm, { username: '', email: '', nickname: '', password: '', roleIds: [] })
   createVisible.value = true
 }
 
@@ -107,6 +107,7 @@ async function submitCreate() {
   creating.value = true
   try {
     await userApi.create({
+      username: createForm.username.trim() || undefined,
       email: createForm.email.trim(),
       password: createForm.password,
       nickname: createForm.nickname.trim() || undefined,
@@ -126,13 +127,12 @@ async function submitCreate() {
 const editVisible = ref(false)
 const editingUser = ref<AdminUser | null>(null)
 const editSaving = ref(false)
-const editForm = reactive({ email: '', nickname: '', avatar: '', bio: '' })
+const editForm = reactive({ email: '', avatar: '', bio: '' })
 
 function openEdit(row: AdminUser) {
   editingUser.value = row
   Object.assign(editForm, {
     email: row.email,
-    nickname: row.nickname,
     avatar: row.avatar ?? '',
     bio: row.bio ?? ''
   })
@@ -145,15 +145,10 @@ async function submitEdit() {
     ElMessage.warning('邮箱不能为空')
     return
   }
-  if (!editForm.nickname.trim()) {
-    ElMessage.warning('昵称不能为空')
-    return
-  }
   editSaving.value = true
   try {
     await userApi.update(editingUser.value.id, {
       email: editForm.email.trim(),
-      nickname: editForm.nickname.trim(),
       avatar: editForm.avatar.trim(),
       bio: editForm.bio.trim()
     })
@@ -212,7 +207,7 @@ onMounted(async () => {
                 {{ (row.nickname || '?').slice(0, 1) }}
               </el-avatar>
               <div class="user__text">
-                <span class="user__name">{{ row.nickname }}</span>
+                <span class="user__name">{{ row.username || row.nickname }}</span>
                 <span class="muted">{{ row.email }}</span>
               </div>
             </div>
@@ -284,11 +279,11 @@ onMounted(async () => {
 
     <el-dialog v-model="createVisible" title="新增用户" width="480px">
       <el-form label-position="top">
+        <el-form-item label="账号名" required>
+          <el-input v-model="createForm.username" maxlength="30" placeholder="2-30 位，创建后不可修改" />
+        </el-form-item>
         <el-form-item label="邮箱" required>
           <el-input v-model="createForm.email" placeholder="user@example.com" />
-        </el-form-item>
-        <el-form-item label="昵称">
-          <el-input v-model="createForm.nickname" maxlength="50" placeholder="留空则用邮箱前缀" />
         </el-form-item>
         <el-form-item label="密码" required>
           <el-input
@@ -312,11 +307,11 @@ onMounted(async () => {
 
     <el-dialog v-model="editVisible" title="编辑用户资料" width="480px">
       <el-form label-position="top">
+        <el-form-item label="账号名（不可修改）">
+          <el-input :model-value="editingUser?.username ?? editingUser?.nickname" disabled />
+        </el-form-item>
         <el-form-item label="邮箱" required>
           <el-input v-model="editForm.email" placeholder="修改后需要重新验证邮箱" />
-        </el-form-item>
-        <el-form-item label="昵称" required>
-          <el-input v-model="editForm.nickname" maxlength="50" />
         </el-form-item>
         <el-form-item label="头像地址">
           <el-input v-model="editForm.avatar" placeholder="可留空，支持站内 /uploads 链接" />
