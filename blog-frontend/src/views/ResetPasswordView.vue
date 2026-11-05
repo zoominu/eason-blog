@@ -39,7 +39,6 @@ async function submit() {
 
 <template>
   <div class="auth-page">
-    <div class="auth-bg" aria-hidden="true" />
     <div class="container narrow auth">
       <div class="card panel">
       <h1>重置密码</h1>

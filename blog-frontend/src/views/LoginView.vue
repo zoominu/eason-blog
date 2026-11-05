@@ -34,7 +34,6 @@ async function submit() {
 
 <template>
   <div class="auth-page">
-    <div class="auth-bg" aria-hidden="true" />
     <div class="container auth">
       <div class="card panel">
         <h1>登录</h1>

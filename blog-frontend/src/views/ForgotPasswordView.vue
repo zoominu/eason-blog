@@ -25,7 +25,6 @@ async function submit() {
 
 <template>
   <div class="auth-page">
-    <div class="auth-bg" aria-hidden="true" />
     <div class="container narrow auth">
       <RouterLink to="/login" class="back"><ArrowLeft :size="15" /> 返回登录</RouterLink>
 
