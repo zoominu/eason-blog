@@ -193,6 +193,56 @@ a {
   font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
 }
 
+/* 登录/注册页：随机壁纸背景（paugram API 会 302 到实际图片） */
+.auth-page {
+  position: relative;
+  min-height: calc(100vh - 72px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 16px;
+  overflow: hidden;
+}
+
+.auth-bg {
+  position: absolute;
+  inset: 0;
+  background-color: #1a1d24;
+  background-image: url('https://api.paugram.com/wallpaper/?source=gt');
+  background-size: cover;
+  background-position: center;
+  filter: brightness(0.55) saturate(1.05);
+  transform: scale(1.02);
+}
+
+.auth-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(8, 10, 16, 0.35), rgba(8, 10, 16, 0.15));
+  pointer-events: none;
+}
+
+.auth-page > .auth {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+}
+
+.auth-page .card {
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme='light'] .auth-page .card {
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+}
+
+[data-theme='dark'] .auth-page .card {
+  background: rgba(24, 26, 32, 0.92);
+  backdrop-filter: blur(8px);
+}
+
 .prose-blog pre {
   position: relative;
   background: var(--bg-soft);

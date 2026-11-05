@@ -76,10 +76,12 @@ async function submit() {
 </script>
 
 <template>
-  <div class="container auth">
-    <div class="card panel">
-      <h1>注册</h1>
-      <p class="muted">注册后可以评论、收藏和留言，我们会发一封验证邮件。</p>
+  <div class="auth-page">
+    <div class="auth-bg" aria-hidden="true" />
+    <div class="container auth">
+      <div class="card panel">
+        <h1>注册</h1>
+        <p class="muted">注册后可以评论、收藏和留言，我们会发一封验证邮件。</p>
 
       <form class="form" @submit.prevent="submit">
         <label class="field">
@@ -126,13 +128,14 @@ async function submit() {
         <RouterLink to="/login" class="link">去登录</RouterLink>
       </p>
     </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .auth {
   max-width: 460px;
-  padding-top: 24px;
+  margin: 0 auto;
 }
 
 .panel {
