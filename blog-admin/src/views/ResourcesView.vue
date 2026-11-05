@@ -48,10 +48,20 @@ function statusText(status: number) {
 
 const previewVisible = ref(false)
 const previewItem = ref<ResourceItem | null>(null)
+const videoError = ref(false)
 
 function openPreview(item: ResourceItem) {
   previewItem.value = item
+  videoError.value = false
   previewVisible.value = true
+}
+
+/** 有些 H.265/HEVC 视频能读出时长但视频轨无法解码（videoWidth=0），给出下载提示 */
+function onVideoMeta(event: Event) {
+  const video = event.target as HTMLVideoElement
+  if (video.videoWidth === 0 && video.videoHeight === 0) {
+    videoError.value = true
+  }
 }
 
 function sizeText(bytes: number) {
@@ -264,8 +274,11 @@ onMounted(load)
           v-else-if="previewItem.mimeType.startsWith('video/')"
           :src="previewItem.url"
           controls
-          autoplay
+          playsinline
+          preload="metadata"
           class="preview__media"
+          @error="videoError = true"
+          @loadedmetadata="onVideoMeta"
         />
         <audio
           v-else-if="previewItem.mimeType.startsWith('audio/')"
@@ -278,6 +291,16 @@ onMounted(load)
           <p class="muted">该类型不支持在线预览</p>
           <el-button type="primary" tag="a" :href="previewItem.url" target="_blank">打开文件</el-button>
         </div>
+        <p v-if="videoError" class="preview__error">
+          浏览器无法播放这个视频（常见于 H.265/HEVC 编码）。
+          <a :href="previewItem.url" target="_blank">下载原文件</a>
+        </p>
+        <a
+          v-if="previewItem.mimeType.startsWith('video/')"
+          :href="previewItem.url"
+          target="_blank"
+          class="preview__download"
+        >下载原视频</a>
       </div>
     </el-dialog>
   </div>
@@ -333,6 +356,7 @@ onMounted(load)
 }
 
 .thumb {
+  position: relative;
   cursor: pointer;
 }
 
@@ -382,6 +406,21 @@ onMounted(load)
   flex-direction: column;
   align-items: center;
   gap: 10px;
+}
+
+.preview__error {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--admin-muted);
+  text-align: center;
+}
+
+.preview__download {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  text-align: center;
+  color: var(--el-color-primary);
 }
 
 .upload-progress {
