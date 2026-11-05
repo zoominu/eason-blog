@@ -13,6 +13,7 @@ const nickname = ref('')
 const password = ref('')
 const confirm = ref('')
 const code = ref('')
+const agreed = ref(false)
 const sending = ref(false)
 const countdown = ref(0)
 const loading = ref(false)
@@ -53,6 +54,10 @@ async function submit() {
   }
   if (password.value !== confirm.value) {
     error.value = '两次输入的密码不一致'
+    return
+  }
+  if (!agreed.value) {
+    error.value = '请先阅读并同意《用户协议》和《隐私政策》'
     return
   }
 
@@ -113,9 +118,19 @@ async function submit() {
           <input v-model="confirm" type="password" autocomplete="new-password" placeholder="再输入一次" />
         </label>
 
+        <label class="agree">
+          <input v-model="agreed" type="checkbox" />
+          <span>
+            我已阅读并同意
+            <RouterLink to="/terms" target="_blank" class="link">《用户协议》</RouterLink>
+            和
+            <RouterLink to="/privacy" target="_blank" class="link">《隐私政策》</RouterLink>
+          </span>
+        </label>
+
         <p v-if="error" class="error">{{ error }}</p>
 
-        <button class="btn btn-primary submit" type="submit" :disabled="loading">
+        <button class="btn btn-primary submit" type="submit" :disabled="loading || !agreed">
           <Loader2 v-if="loading" :size="16" class="spin" />
           <UserPlus v-else :size="16" />
           注册并登录
@@ -175,6 +190,27 @@ async function submit() {
 
 .field input:focus {
   border-color: var(--accent);
+}
+
+.agree {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--fg-soft);
+}
+
+.agree input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+.agree .link {
+  color: var(--accent);
 }
 
 .submit {

@@ -220,7 +220,8 @@ a {
 
 .auth-page .card {
   background: #fff;
-  box-shadow: 0 24px 70px rgba(17, 24, 39, 0.16);
+  border-color: transparent;
+  box-shadow: none;
 }
 
 .prose-blog pre {

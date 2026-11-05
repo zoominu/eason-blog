@@ -28,6 +28,10 @@ const year = computed(() => new Date().getFullYear())
         <span>© {{ year }} {{ config['site.author'] || 'Eason' }}</span>
         <span v-if="config['site.icp']"> · {{ config['site.icp'] }}</span>
         <span> · Built with Spring Boot &amp; Vue 3</span>
+        <span class="footer__links">
+          · <RouterLink to="/terms">用户协议</RouterLink>
+          · <RouterLink to="/privacy">隐私政策</RouterLink>
+        </span>
       </div>
     </div>
   </footer>
@@ -62,5 +66,14 @@ const year = computed(() => new Date().getFullYear())
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.footer__links a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.footer__links a:hover {
+  color: var(--accent);
 }
 </style>

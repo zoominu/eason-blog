@@ -77,6 +77,7 @@ const isAuth = computed(() => AUTH_ROUTES.has(String(route.name)))
 
 .layout--auth :deep(.footer) {
   background: transparent !important;
-  border-top-color: transparent !important;
+  border-top: none !important;
+  box-shadow: none !important;
 }
 </style>
