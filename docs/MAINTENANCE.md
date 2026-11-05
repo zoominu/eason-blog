@@ -285,6 +285,25 @@ curl -X PATCH http://127.0.0.1/api/v1/admin/settings \
   -d '{"comment.audit":"false","audit.banned-words":"违禁词1\n违禁词2","audit.banned-action":"review"}'
 ```
 
+### 7.2 邮件（注册验证码 / 订阅通知）
+
+后台「系统设置 → 邮件设置」填写（即时生效）：
+
+| 配置 | 说明 |
+| --- | --- |
+| `mail.enabled` | 开启后注册必须邮箱验证码，发布文章会给订阅者发邮件 |
+| `mail.host` / `mail.port` | SMTP 地址；QQ 邮箱 `smtp.qq.com:465` |
+| `mail.username` | 完整邮箱地址 |
+| `mail.password` | **SMTP 授权码**（QQ/163 在邮箱设置里生成，不是登录密码） |
+| `mail.from` | 发件人显示地址，留空用 username |
+| `mail.ssl` | 465 端口选「是」；587 选「否」（STARTTLS） |
+| `site.url` | 站点对外地址，用于邮件里的文章链接，如 `http://39.96.94.89` |
+
+填写后点「保存修改」，再点「发送测试邮件」（收件人默认用 SMTP 账号）。
+发送失败会直接显示 SMTP 返回的错误（授权码错、端口不对等）。
+
+> 注意：开启 `mail.enabled` 后，新注册用户必须先点「发送验证码」并填入 6 位验证码。
+
 ---
 
 ## 8. 日志与排查

@@ -20,5 +20,8 @@ public record RegisterRequest(
         String password,
 
         @Size(min = 1, max = 50, message = "昵称长度需在 1-50 之间")
-        String nickname) {
+        String nickname,
+
+        /** 开启邮件后注册需要邮箱验证码 */
+        String code) {
 }

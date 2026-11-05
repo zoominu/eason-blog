@@ -366,6 +366,20 @@ MIME 需匹配对应类型；存储名随机（UUID），原始文件名只入�
 文章删除不再进入回收站：`DELETE /admin/articles/{id}` 直接删除（后台与前台都不再出现）；
 只想让访客看不到时用 `POST /admin/articles/{id}/offline` 下线。
 
+### 4.9 邮件
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/auth/email-code` | `{email}`，发送 6 位注册验证码（10 分钟有效） |
+| POST | `/auth/register` | 开启邮件后需额外传 `code` |
+| GET | `/users/me/subscription` | 查询是否订阅新文章邮件 |
+| POST | `/users/me/subscription` | `{enabled:true/false}` 开启/关闭订阅 |
+| POST | `/admin/settings/mail-test` | `{to}`，用当前 SMTP 配置发测试邮件 |
+
+后台「系统设置 → 邮件设置」可配置：`mail.enabled`、`mail.host`、`mail.port`、
+`mail.username`、`mail.password`（**授权码**）、`mail.from`、`mail.ssl`、`site.url`。
+开启 `mail.enabled=true` 后，注册必须邮箱验证码；文章发布时会给订阅用户群发（最多 100 人）。
+
 后台列表（评论/留言/用户/日志/资源/文章）单页上限 100，公开接口仍为 50。
 
 批量审核：`POST /admin/comments/batch`、`POST /admin/guestbook/batch`，

@@ -10,6 +10,7 @@ const list = ref<ResourceItem[]>([])
 const total = ref(0)
 const loading = ref(false)
 const uploading = ref(false)
+const uploadPercent = ref(0)
 
 const query = reactive({ page: 1, size: 12, keyword: '', type: '' })
 
@@ -66,14 +67,19 @@ async function load() {
 
 async function onUpload(options: { file: File }) {
   uploading.value = true
+  uploadPercent.value = 0
   try {
-    await resourceApi.upload(options.file)
+    await resourceApi.upload(options.file, undefined, (percent) => {
+      uploadPercent.value = percent
+    })
+    uploadPercent.value = 100
     ElMessage.success('上传成功')
     await load()
   } catch (e) {
     ElMessage.error((e as Error).message)
   } finally {
     uploading.value = false
+    setTimeout(() => { uploadPercent.value = 0 }, 800)
   }
 }
 
@@ -134,7 +140,7 @@ onMounted(load)
     <header class="page__head">
       <div>
         <h2 class="page__title">资源管理</h2>
-        <p class="page__desc">支持图片 / 音视频 / PDF / 文本 / zip，单文件 ≤ 20MB；被文章引用的资源不能删除</p>
+        <p class="page__desc">支持图片 / 音视频 / PDF / 文本 / zip，单文件 ≤ 200MB；被文章引用的资源不能删除</p>
       </div>
       <el-upload :show-file-list="false" :http-request="onUpload" :disabled="uploading">
         <el-button type="primary" :loading="uploading">上传文件</el-button>
@@ -152,6 +158,13 @@ onMounted(load)
           @clear="load"
         />
         <el-button @click="load">查询</el-button>
+        <el-progress
+          v-if="uploading"
+          :percentage="uploadPercent"
+          :stroke-width="8"
+          style="width: 200px"
+        />
+        <span v-if="uploading" class="muted">上传中 {{ uploadPercent }}%</span>
         <el-select v-model="query.type" placeholder="全部类型" clearable style="width: 140px" @change="() => { query.page = 1; load() }">
           <el-option v-for="(meta, key) in TYPE_META" :key="key" :label="meta.label" :value="key" />
         </el-select>

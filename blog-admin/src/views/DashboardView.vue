@@ -86,18 +86,10 @@ const cards = computed<
     {
       label: '已下线',
       value: data.value.offlineArticles,
-      hint: '重新发布或回收',
+      hint: '重新发布或删除',
       to: { path: '/articles', query: { status: 2 } },
       icon: ChatDotRound,
       tone: 'warning'
-    },
-    {
-      label: '回收站',
-      value: data.value.recycledArticles,
-      hint: '可恢复的文章',
-      to: { path: '/articles', query: { status: 3 } },
-      icon: FolderOpened,
-      tone: 'danger'
     }
   ]
 })

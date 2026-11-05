@@ -261,6 +261,32 @@ class AuditPolicyTest {
     }
 
     @Test
+    void subscriptionCanBeToggled() throws Exception {
+        mockMvc.perform(get("/api/v1/users/me/subscription").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscribed").value(false));
+
+        mockMvc.perform(post("/api/v1/users/me/subscription").cookie(userCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"enabled\":true}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/users/me/subscription").cookie(userCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.subscribed").value(true));
+    }
+
+    @Test
+    void emailCodeRequiresMailEnabled() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/email-code")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"someone@test.local\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message")
+                        .value(org.hamcrest.Matchers.containsString("未开启邮件功能")));
+    }
+
+    @Test
     void nicknameIsCheckedAgainstBannedWords() throws Exception {
         setConfig("audit.banned-words", "违禁昵称");
 

@@ -46,6 +46,12 @@ const SELECT_OPTIONS: Record<string, { label: string; value: string }[]> = {
 /** 以 .enabled / .audit 结尾的布尔配置也走下拉 */
 function optionsFor(key: string) {
   if (SELECT_OPTIONS[key]) return SELECT_OPTIONS[key]
+  if (key === 'mail.ssl') {
+    return [
+      { label: '是（SSL，常见 465）', value: 'true' },
+      { label: '否（STARTTLS）', value: 'false' }
+    ]
+  }
   if (key.endsWith('.enabled') || key.endsWith('.audit')) {
     return [
       { label: '是', value: 'true' },
@@ -53,6 +59,25 @@ function optionsFor(key: string) {
     ]
   }
   return null
+}
+
+/** 发送测试邮件（先用「保存修改」写入配置） */
+const testingMail = ref(false)
+async function sendTestMail() {
+  const to = draft.value['mail.username'] || draft.value['mail.from'] || ''
+  if (!to) {
+    ElMessage.warning('请先填写 SMTP 账号')
+    return
+  }
+  testingMail.value = true
+  try {
+    await settingApi.mailTest(to)
+    ElMessage.success('测试邮件已发送，请查收')
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    testingMail.value = false
+  }
 }
 
 /** 分享模板、违禁词这类多行文本用 textarea */
@@ -78,6 +103,7 @@ const groups = computed(() => {
     register: '注册',
     storage: '存储',
     audit: '审核与违禁词',
+    mail: '邮件设置',
     share: '分享',
     其他: '其他'
   }
@@ -156,6 +182,10 @@ onMounted(load)
             <span class="panel__title">{{ group.label }}</span>
             <span class="panel__count">{{ group.list.length }} 项</span>
           </template>
+          <div v-if="group.prefix === 'mail'" class="mail-test">
+            <el-button size="small" :loading="testingMail" @click="sendTestMail">发送测试邮件</el-button>
+            <span class="muted">先点右上角「保存修改」，再发送测试邮件验证授权码</span>
+          </div>
           <el-form label-position="top">
             <el-form-item v-for="item in group.list" :key="item.key" :label="item.description || item.key">
               <el-select
@@ -177,6 +207,13 @@ onMounted(load)
                 type="textarea"
                 :rows="3"
                 :placeholder="item.key"
+              />
+              <el-input
+                v-else-if="item.key === 'mail.password'"
+                v-model="draft[item.key]"
+                type="password"
+                show-password
+                placeholder="SMTP 授权码"
               />
               <el-input v-else v-model="draft[item.key]" :placeholder="item.key" />
               <p class="hint">
@@ -217,6 +254,16 @@ onMounted(load)
   font-size: 12px;
   font-weight: 400;
   color: var(--admin-muted);
+}
+
+.mail-test {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border: 1px dashed var(--admin-border);
+  border-radius: 8px;
 }
 
 .panel__title {

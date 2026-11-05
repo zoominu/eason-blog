@@ -27,6 +27,31 @@ const error = ref('')
 const uploadingAvatar = ref(false)
 const avatarInput = ref<HTMLInputElement | null>(null)
 const avatarMessage = ref('')
+const subscribed = ref(false)
+const subLoading = ref(false)
+
+async function loadSubscription() {
+  try {
+    const result = await interactionApi.subscription()
+    subscribed.value = result.subscribed
+  } catch {
+    // 邮件未启用时静默失败
+  }
+}
+
+async function toggleSubscription() {
+  subLoading.value = true
+  message.value = ''
+  try {
+    const result = await interactionApi.setSubscription(!subscribed.value)
+    subscribed.value = result.subscribed
+    message.value = result.subscribed ? '已开启新文章邮件订阅' : '已关闭邮件订阅'
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    subLoading.value = false
+  }
+}
 
 async function onAvatarChange(event: Event) {
   const input = event.target as HTMLInputElement
@@ -335,6 +360,7 @@ onMounted(async () => {
   await userStore.fetchMe()
   nickname.value = userStore.user?.nickname ?? ''
   bio.value = userStore.user?.bio ?? ''
+  await loadSubscription()
 
   // 支持从页头「通知」直接跳 /user?tab=notifications
   const requested = String(route.query.tab ?? '')
@@ -433,6 +459,14 @@ watch(
         <p v-if="error" class="error">{{ error }}</p>
         <button class="btn btn-primary" :disabled="saving" @click="saveProfile">
           <Save :size="15" /> {{ saving ? '保存中…' : '保存资料' }}
+        </button>
+      </div>
+
+      <div class="card block">
+        <h2>邮件订阅</h2>
+        <p class="muted">开启后，新文章发布时会给你发一封邮件通知。</p>
+        <button class="btn" :disabled="subLoading" @click="toggleSubscription">
+          {{ subLoading ? '处理中…' : subscribed ? '关闭订阅' : '开启订阅' }}
         </button>
       </div>
 

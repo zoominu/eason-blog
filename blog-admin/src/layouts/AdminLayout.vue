@@ -73,9 +73,7 @@ async function logout() {
 
     <el-container>
       <el-header class="header">
-        <div class="header__left">
-          <span class="header__title">{{ currentTitle }}</span>
-        </div>
+        <div class="header__left" />
         <div class="header__right">
           <el-tooltip :content="theme.dark ? '切换浅色' : '切换深色'">
             <el-button circle text @click="theme.toggle()">

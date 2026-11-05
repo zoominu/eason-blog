@@ -52,15 +52,18 @@ public class AdminArticleService {
     private final ArticleTagMapper articleTagMapper;
     private final CategoryMapper categoryMapper;
     private final TagMapper tagMapper;
+    private final com.eason.blog.common.mail.SubscriptionNotifyService subscriptionNotifyService;
 
     public AdminArticleService(ArticleMapper articleMapper,
                                ArticleTagMapper articleTagMapper,
                                CategoryMapper categoryMapper,
-                               TagMapper tagMapper) {
+                               TagMapper tagMapper,
+                               com.eason.blog.common.mail.SubscriptionNotifyService subscriptionNotifyService) {
         this.articleMapper = articleMapper;
         this.articleTagMapper = articleTagMapper;
         this.categoryMapper = categoryMapper;
         this.tagMapper = tagMapper;
+        this.subscriptionNotifyService = subscriptionNotifyService;
     }
 
     public PageResult<AdminArticleListItemVO> page(AdminArticleQuery query) {
@@ -190,6 +193,15 @@ public class AdminArticleService {
         }
         article.setUpdateTime(LocalDateTime.now());
         articleMapper.updateById(article);
+        // 发布后异步通知订阅者，失败不影响发布
+        final Article published = article;
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                subscriptionNotifyService.notifyPublished(published);
+            } catch (RuntimeException ignored) {
+                // 邮件失败只记日志
+            }
+        });
     }
 
     @Transactional

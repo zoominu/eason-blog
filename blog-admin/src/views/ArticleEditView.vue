@@ -3,7 +3,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Check, Promotion } from '@element-plus/icons-vue'
-import { articleApi, categoryApi, tagApi } from '@/api'
+import { articleApi, categoryApi, resourceApi, tagApi } from '@/api'
 import type { ArticleStatus, Category, Tag } from '@/api/types'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 
@@ -120,6 +120,36 @@ async function load() {
 
 async function back() {
   await router.push('/articles')
+}
+
+// ---------------- 封面图上传 ----------------
+const coverInput = ref<HTMLInputElement | null>(null)
+const coverUploading = ref(false)
+const coverPercent = ref(0)
+
+async function onCoverChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  if (!file.type.startsWith('image/')) {
+    ElMessage.warning('请选择图片文件')
+    return
+  }
+  coverUploading.value = true
+  coverPercent.value = 0
+  try {
+    const resource = await resourceApi.upload(file, 'article_image', (percent) => {
+      coverPercent.value = percent
+    })
+    form.cover = resource.url
+    coverPercent.value = 100
+    ElMessage.success('封面已上传')
+  } catch (e) {
+    ElMessage.error((e as Error).message)
+  } finally {
+    coverUploading.value = false
+  }
 }
 
 // ---------------- 导入 Markdown（含随文图片） ----------------
@@ -285,8 +315,29 @@ watch(
                 placeholder="留空时列表页会从正文截取"
               />
             </el-form-item>
-            <el-form-item label="封面图地址">
-              <el-input v-model="form.cover" placeholder="可留空" />
+            <el-form-item label="封面图">
+              <div class="cover-field">
+                <img v-if="form.cover" :src="form.cover" class="cover-preview" alt="封面预览" />
+                <div class="cover-actions">
+                  <el-button :loading="coverUploading" @click="coverInput?.click()">上传封面</el-button>
+                  <el-button v-if="form.cover" text type="danger" @click="form.cover = ''">清除</el-button>
+                  <el-progress
+                    v-if="coverUploading"
+                    :percentage="coverPercent"
+                    :stroke-width="6"
+                    style="width: 160px"
+                  />
+                  <p class="hint">建议 16:9，上传后自动填入图片地址</p>
+                </div>
+                <input
+                  ref="coverInput"
+                  type="file"
+                  accept="image/*"
+                  class="hidden-input"
+                  @change="onCoverChange"
+                />
+              </div>
+              <el-input v-model="form.cover" placeholder="也可直接粘贴图片地址" />
             </el-form-item>
             <el-form-item label="SEO 标题">
               <el-input v-model="form.seoTitle" maxlength="200" placeholder="默认使用文章标题" />
@@ -304,6 +355,31 @@ watch(
 <style scoped>
 .md-input {
   display: none;
+}
+
+.hidden-input {
+  display: none;
+}
+
+.cover-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.cover-preview {
+  width: 120px;
+  height: 68px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid var(--admin-border);
+}
+
+.cover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .head-left {

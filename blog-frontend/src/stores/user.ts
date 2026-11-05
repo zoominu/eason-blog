@@ -29,7 +29,7 @@ export const useUserStore = defineStore('user', {
       this.initialized = true
       return this.user
     },
-    async register(payload: { email: string; password: string; nickname?: string }) {
+    async register(payload: { email: string; password: string; nickname?: string; code?: string }) {
       return authApi.register(payload)
     },
     async logout() {

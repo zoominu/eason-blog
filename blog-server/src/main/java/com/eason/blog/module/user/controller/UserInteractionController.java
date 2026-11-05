@@ -98,6 +98,22 @@ public class UserInteractionController {
                         body.getOrDefault("ids", List.of()))));
     }
 
+    @GetMapping("/subscription")
+    public ApiResponse<java.util.Map<String, Boolean>> subscription(
+            @AuthenticationPrincipal UserPrincipal principal) {
+        return ApiResponse.success(java.util.Map.of(
+                "subscribed", interactionService.subscribed(principal.getId())));
+    }
+
+    @PostMapping("/subscription")
+    public ApiResponse<java.util.Map<String, Boolean>> setSubscription(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @RequestBody java.util.Map<String, Boolean> body) {
+        boolean enabled = Boolean.TRUE.equals(body.get("enabled"));
+        interactionService.setSubscription(principal.getId(), enabled);
+        return ApiResponse.success(java.util.Map.of("subscribed", enabled));
+    }
+
     @GetMapping("/notifications")
     public ApiResponse<List<NotificationVO>> notifications(
             @AuthenticationPrincipal UserPrincipal principal,

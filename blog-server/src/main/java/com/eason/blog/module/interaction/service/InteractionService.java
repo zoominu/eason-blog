@@ -20,6 +20,8 @@ import com.eason.blog.module.comment.vo.InteractionVO;
 import com.eason.blog.module.comment.vo.MyCommentVO;
 import com.eason.blog.module.favorite.entity.Favorite;
 import com.eason.blog.module.favorite.mapper.FavoriteMapper;
+import com.eason.blog.module.interaction.entity.Subscription;
+import com.eason.blog.module.interaction.mapper.SubscriptionMapper;
 import com.eason.blog.module.guestbook.entity.Guestbook;
 import com.eason.blog.module.guestbook.mapper.GuestbookMapper;
 import com.eason.blog.module.guestbook.vo.AdminGuestbookVO;
@@ -75,6 +77,7 @@ public class InteractionService {
     private final ArticleTagResolver tagResolver;
     private final UserRoleMapper userRoleMapper;
     private final ContentAuditPolicy auditPolicy;
+    private final SubscriptionMapper subscriptionMapper;
 
     public InteractionService(ArticleMapper articleMapper,
                               CommentMapper commentMapper,
@@ -87,7 +90,8 @@ public class InteractionService {
                               RateLimiter rateLimiter,
                               ArticleTagResolver tagResolver,
                               UserRoleMapper userRoleMapper,
-                              ContentAuditPolicy auditPolicy) {
+                              ContentAuditPolicy auditPolicy,
+                              SubscriptionMapper subscriptionMapper) {
         this.articleMapper = articleMapper;
         this.commentMapper = commentMapper;
         this.favoriteMapper = favoriteMapper;
@@ -100,6 +104,7 @@ public class InteractionService {
         this.tagResolver = tagResolver;
         this.userRoleMapper = userRoleMapper;
         this.auditPolicy = auditPolicy;
+        this.subscriptionMapper = subscriptionMapper;
     }
 
     // ------------------------------------------------------------------ 评论
@@ -406,6 +411,47 @@ public class InteractionService {
                         n.getContent(), n.getLink(), n.getIsRead() != null && n.getIsRead() == 1,
                         n.getCreateTime()))
                 .toList();
+    }
+
+    // ---------------------------------------------------------- 邮件订阅
+
+    /** 当前用户是否订阅了新文章邮件。 */
+    public boolean subscribed(Long userId) {
+        User user = userMapper.selectById(userId);
+        if (user == null || user.getEmail() == null) {
+            return false;
+        }
+        Long count = subscriptionMapper.selectCount(Wrappers.<Subscription>lambdaQuery()
+                .eq(Subscription::getEmail, user.getEmail())
+                .eq(Subscription::getEnabled, 1));
+        return count != null && count > 0;
+    }
+
+    /** 开启/关闭订阅（按邮箱去重）。 */
+    @Transactional
+    public void setSubscription(Long userId, boolean enabled) {
+        User user = userMapper.selectById(userId);
+        if (user == null || user.getEmail() == null) {
+            throw BusinessException.notFound("用户不存在");
+        }
+        Subscription existing = subscriptionMapper.selectOne(Wrappers.<Subscription>lambdaQuery()
+                .eq(Subscription::getEmail, user.getEmail())
+                .last("limit 1"));
+        LocalDateTime now = LocalDateTime.now();
+        if (existing == null) {
+            Subscription sub = new Subscription();
+            sub.setUserId(userId);
+            sub.setEmail(user.getEmail());
+            sub.setEnabled(enabled ? 1 : 0);
+            sub.setCreateTime(now);
+            sub.setUpdateTime(now);
+            subscriptionMapper.insert(sub);
+        } else {
+            existing.setEnabled(enabled ? 1 : 0);
+            existing.setUserId(userId);
+            existing.setUpdateTime(now);
+            subscriptionMapper.updateById(existing);
+        }
     }
 
     // ------------------------------------------------------- 个人中心管理

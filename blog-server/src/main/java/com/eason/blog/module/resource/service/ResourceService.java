@@ -57,7 +57,7 @@ public class ResourceService {
     public static final Set<String> TYPES = Set.of(
             TYPE_AVATAR, TYPE_ARTICLE_IMAGE, TYPE_MUSIC, TYPE_VIDEO, TYPE_DOCUMENT, TYPE_OTHER);
 
-    private static final long MAX_SIZE = 20L * 1024 * 1024;
+    private static final long MAX_SIZE = 200L * 1024 * 1024;
     private static final Set<String> ALLOWED_EXT = Set.of(
             "png", "jpg", "jpeg", "gif", "webp", "svg",
             "mp3", "wav", "ogg", "m4a", "flac",
@@ -89,20 +89,54 @@ public class ResourceService {
             throw BusinessException.badRequest("文件为空");
         }
         if (file.getSize() > MAX_SIZE) {
-            throw BusinessException.badRequest("文件不能超过 20MB");
+            throw BusinessException.badRequest("文件不能超过 200MB");
         }
 
         String original = StringUtils.hasText(file.getOriginalFilename())
-                ? Paths.get(file.getOriginalFilename()).getFileName().toString()
+                ? Paths.get(file.getOriginalFilename().replace('\\', '/')).getFileName().toString()
                 : "unnamed";
-        String mime = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
-        byte[] bytes;
-        try {
-            bytes = file.getBytes();
-        } catch (IOException e) {
-            throw new BusinessException(com.eason.blog.common.exception.ErrorCode.INTERNAL_ERROR, "读取上传文件失败");
+        String ext = extensionOf(original);
+        if (!ALLOWED_EXT.contains(ext)) {
+            throw BusinessException.badRequest("不支持的文件类型：" + ext);
         }
-        return store(bytes, original, mime, uploaderId, type);
+        String mime = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
+        if (ALLOWED_MIME_PREFIX.stream().noneMatch(mime::startsWith)) {
+            throw BusinessException.badRequest("不支持的文件 MIME 类型");
+        }
+
+        String month = LocalDate.now().format(MONTH);
+        String storedName = UUID.randomUUID().toString().replace("-", "") + "." + ext;
+        Path dir = Paths.get(properties.storage().uploadDir(), month).toAbsolutePath().normalize();
+        Path target = dir.resolve(storedName);
+        if (!target.startsWith(dir)) {
+            throw BusinessException.badRequest("非法的文件路径");
+        }
+
+        // 大文件（视频）直接流式落盘，避免 getBytes() 把整个文件读进 256MB 堆
+        try {
+            Files.createDirectories(dir);
+            try (InputStream in = file.getInputStream()) {
+                Files.copy(in, target, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            throw new BusinessException(com.eason.blog.common.exception.ErrorCode.INTERNAL_ERROR, "文件保存失败");
+        }
+
+        Resource resource = new Resource();
+        resource.setUploaderId(uploaderId);
+        resource.setOriginalName(original);
+        resource.setStoredName(storedName);
+        resource.setPath(month + "/" + storedName);
+        resource.setUrl("/uploads/" + month + "/" + storedName);
+        resource.setMimeType(mime);
+        resource.setType(detectType(mime, ext, type));
+        resource.setSize(file.getSize());
+        resource.setSha256(sha256(target));
+        resource.setCreateTime(LocalDateTime.now());
+        resource.setIsDeleted(0);
+        resourceMapper.insert(resource);
+
+        return toVO(resource);
     }
 
     /**

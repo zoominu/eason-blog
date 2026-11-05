@@ -41,13 +41,31 @@ public class AuthController {
     private final JwtService jwtService;
     private final AppProperties properties;
     private final RateLimiter rateLimiter;
+    private final com.eason.blog.module.auth.service.EmailCodeService emailCodeService;
 
     public AuthController(AuthService authService, JwtService jwtService, AppProperties properties,
-                          RateLimiter rateLimiter) {
+                          RateLimiter rateLimiter,
+                          com.eason.blog.module.auth.service.EmailCodeService emailCodeService) {
         this.authService = authService;
         this.jwtService = jwtService;
         this.properties = properties;
         this.rateLimiter = rateLimiter;
+        this.emailCodeService = emailCodeService;
+    }
+
+    /** 发送注册邮箱验证码：同一邮箱 60 秒一次，单 IP 每小时 20 次。 */
+    @PostMapping("/email-code")
+    public ApiResponse<Void> sendEmailCode(@RequestBody java.util.Map<String, String> body,
+                                           HttpServletRequest httpRequest) {
+        String email = body.getOrDefault("email", "").trim().toLowerCase();
+        if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            throw com.eason.blog.common.exception.BusinessException.badRequest("邮箱格式不正确");
+        }
+        String ip = clientIp(httpRequest);
+        rateLimiter.check("email-code-ip:" + ip, 20, 3600);
+        rateLimiter.check("email-code:" + email, 1, 60);
+        emailCodeService.send(email, com.eason.blog.module.auth.service.EmailCodeService.PURPOSE_REGISTER);
+        return ApiResponse.success();
     }
 
     @PostMapping("/login")

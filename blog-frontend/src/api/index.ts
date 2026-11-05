@@ -51,8 +51,9 @@ export const siteApi = {
 
 export const authApi = {
   login: (email: string, password: string) => post<User>('/auth/login', { email, password }),
-  register: (payload: { email: string; password: string; nickname?: string }) =>
+  register: (payload: { email: string; password: string; nickname?: string; code?: string }) =>
     post<User>('/auth/register', payload),
+  sendEmailCode: (email: string) => post<void>('/auth/email-code', { email }),
   logout: () => post<void>('/auth/logout'),
   me: () => get<User>('/auth/me'),
   updateProfile: (payload: { nickname?: string; avatar?: string; bio?: string }) =>
@@ -104,5 +105,8 @@ export const interactionApi = {
   markAllRead: () => patch<{ updated: number }>('/users/me/notifications/read-all'),
   deleteRead: () => del<{ deleted: number }>('/users/me/notifications/read'),
 
-  submitGuestbook: (content: string) => post<void>('/guestbook', { content })
+  submitGuestbook: (content: string) => post<void>('/guestbook', { content }),
+  subscription: () => get<{ subscribed: boolean }>('/users/me/subscription'),
+  setSubscription: (enabled: boolean) =>
+    post<{ subscribed: boolean }>('/users/me/subscription', { enabled })
 }

@@ -157,12 +157,19 @@ export const resourceApi = {
   list: (params: { keyword?: string; type?: string; page?: number; size?: number }) =>
     get<PageResult<ResourceItem>>('/admin/resources', { ...params }),
   references: (id: number) => get<ResourceRef[]>(`/admin/resources/${id}/references`),
-  upload: (file: File) => {
+  upload: (file: File, type?: string, onProgress?: (percent: number) => void) => {
     const form = new FormData()
     form.append('file', file)
+    if (type) form.append('type', type)
     return instance
       .post<ApiResponse<ResourceItem>>('/admin/resources/upload', form, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 0,
+        onUploadProgress: (event) => {
+          if (onProgress && event.total) {
+            onProgress(Math.min(99, Math.round((event.loaded / event.total) * 100)))
+          }
+        }
       })
       .then((res) => res.data.data)
   },
@@ -178,5 +185,6 @@ export const logApi = {
 
 export const settingApi = {
   list: () => get<SystemConfigItem[]>('/admin/settings'),
-  update: (configs: Record<string, string>) => patch<{ updated: number }>('/admin/settings', configs)
+  update: (configs: Record<string, string>) => patch<{ updated: number }>('/admin/settings', configs),
+  mailTest: (to: string) => post<void>('/admin/settings/mail-test', { to })
 }

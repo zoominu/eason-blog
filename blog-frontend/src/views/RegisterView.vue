@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Loader2, UserPlus } from 'lucide-vue-next'
+import { authApi } from '@/api'
 import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
@@ -11,8 +12,32 @@ const email = ref('')
 const nickname = ref('')
 const password = ref('')
 const confirm = ref('')
+const code = ref('')
+const sending = ref(false)
+const countdown = ref(0)
 const loading = ref(false)
 const error = ref('')
+
+async function sendCode() {
+  error.value = ''
+  if (!email.value.trim()) {
+    error.value = '请先输入邮箱'
+    return
+  }
+  sending.value = true
+  try {
+    await authApi.sendEmailCode(email.value.trim())
+    countdown.value = 60
+    const timer = setInterval(() => {
+      countdown.value -= 1
+      if (countdown.value <= 0) clearInterval(timer)
+    }, 1000)
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    sending.value = false
+  }
+}
 
 const passwordValid = computed(() => password.value.length >= 8 && /[A-Za-z]/.test(password.value) && /\d/.test(password.value))
 
@@ -36,7 +61,8 @@ async function submit() {
     await userStore.register({
       email: email.value.trim(),
       password: password.value,
-      nickname: nickname.value.trim() || undefined
+      nickname: nickname.value.trim() || undefined,
+      code: code.value.trim() || undefined
     })
     // 注册成功后直接登录，减少一次手动操作
     await userStore.login(email.value.trim(), password.value)
@@ -59,6 +85,16 @@ async function submit() {
         <label class="field">
           <span>邮箱</span>
           <input v-model="email" type="email" autocomplete="email" placeholder="you@example.com" />
+        </label>
+
+        <label class="field">
+          <span>邮箱验证码</span>
+          <div class="code-row">
+            <input v-model="code" type="text" maxlength="6" inputmode="numeric" placeholder="6 位验证码" />
+            <button type="button" class="btn btn-sm" :disabled="sending || countdown > 0" @click="sendCode">
+              {{ countdown > 0 ? `${countdown}s` : sending ? '发送中…' : '发送验证码' }}
+            </button>
+          </div>
         </label>
 
         <label class="field">

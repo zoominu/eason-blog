@@ -9,6 +9,7 @@ import com.eason.blog.module.auth.dto.LoginRequest;
 import com.eason.blog.module.auth.dto.RegisterRequest;
 import com.eason.blog.module.auth.service.AuthService;
 import com.eason.blog.module.auth.service.EmailTokenService;
+import com.eason.blog.module.auth.service.EmailCodeService;
 import com.eason.blog.module.auth.vo.LoginResult;
 import com.eason.blog.module.log.entity.LoginLog;
 import com.eason.blog.module.log.mapper.LoginLogMapper;
@@ -53,6 +54,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailTokenService emailTokenService;
     private final MailService mailService;
     private final ContentAuditPolicy auditPolicy;
+    private final EmailCodeService emailCodeService;
 
     public AuthServiceImpl(AuthenticationManager authenticationManager,
                            UserMapper userMapper,
@@ -65,7 +67,8 @@ public class AuthServiceImpl implements AuthService {
                            LoginLogMapper loginLogMapper,
                            EmailTokenService emailTokenService,
                            MailService mailService,
-                           ContentAuditPolicy auditPolicy) {
+                           ContentAuditPolicy auditPolicy,
+                           EmailCodeService emailCodeService) {
         this.authenticationManager = authenticationManager;
         this.userMapper = userMapper;
         this.roleMapper = roleMapper;
@@ -78,6 +81,7 @@ public class AuthServiceImpl implements AuthService {
         this.emailTokenService = emailTokenService;
         this.mailService = mailService;
         this.auditPolicy = auditPolicy;
+        this.emailCodeService = emailCodeService;
     }
 
     @Override
@@ -142,6 +146,9 @@ public class AuthServiceImpl implements AuthService {
         String email = request.email().trim().toLowerCase();
         if (userService.getByEmail(email) != null) {
             throw BusinessException.conflict("该邮箱已注册");
+        }
+        if (mailService.enabled()) {
+            emailCodeService.verify(email, EmailCodeService.PURPOSE_REGISTER, request.code());
         }
 
         LocalDateTime now = LocalDateTime.now();
