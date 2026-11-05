@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Eye, Clock, Pin } from 'lucide-vue-next'
+import { Eye, Clock, Pin, FileText } from 'lucide-vue-next'
 import type { ArticleSummary } from '@/api/types'
 import { formatDate, formatCount } from '@/utils/format'
 
@@ -8,7 +8,11 @@ defineProps<{ article: ArticleSummary }>()
 
 <template>
   <RouterLink :to="`/article/${article.slug}`" class="card article-card fade-in">
-    <img v-if="article.cover" :src="article.cover" class="article-card__cover" :alt="article.title" />
+    <!-- 固定高度的缩略图区：没有封面也占位，保证所有卡片的分类行在同一水平线 -->
+    <div class="article-card__cover" :class="{ 'article-card__cover--empty': !article.cover }">
+      <img v-if="article.cover" :src="article.cover" :alt="article.title" />
+      <FileText v-else :size="34" class="article-card__initial" />
+    </div>
 
     <div class="article-card__head">
       <span v-if="article.categoryName" class="tag-chip">{{ article.categoryName }}</span>
@@ -41,8 +45,30 @@ defineProps<{ article: ArticleSummary }>()
   width: calc(100% + 48px);
   margin: -22px -24px 0;
   height: 150px;
-  object-fit: cover;
+  overflow: hidden;
   border-radius: 16px 16px 0 0;
+  background: var(--bg-soft);
+}
+
+.article-card__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.article-card__cover--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--accent) 16%, var(--bg-soft)),
+    color-mix(in srgb, var(--accent) 4%, var(--bg-soft)));
+}
+
+.article-card__initial {
+  color: color-mix(in srgb, var(--accent) 45%, transparent);
+  user-select: none;
 }
 
 .article-card:hover {

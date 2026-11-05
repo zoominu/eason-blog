@@ -41,6 +41,15 @@
 
 普通用户：`easonblog`（系统用户），拥有 `/opt/eason-blog`；`/var/www` 归 `www-data`。
 
+> Nginx 站点里有两个容易踩的配置，务必保留：
+> ```nginx
+> absolute_redirect off;        # 否则 /admin 会 301 到 http://域名:8080/admin/
+> location = /admin {
+>     return 301 /admin/;       # 少写结尾斜杠也能进后台
+> }
+> ```
+> 改完配置执行 `systemctl reload nginx`；如果发现跳转还是带 :8080，用 `systemctl restart nginx`（reload 偶发不生效）。
+
 ## 3. 管理员与初始数据
 
 - 地址：`http://39.96.94.89/admin/`（雷池配置 80 后）
