@@ -124,21 +124,41 @@ public class InteractionService {
         int page = Math.max(pageNo, 1);
         int pageSize = Math.min(Math.max(size, 1), 50);
 
-        List<Comment> all = commentMapper.selectList(Wrappers.<Comment>lambdaQuery()
+        // 顶层评论走数据库分页，避免热门文章把全部评论一次性读进内存
+        Page<Comment> rootPage = new Page<>(page, pageSize);
+        commentMapper.selectPage(rootPage, Wrappers.<Comment>lambdaQuery()
                 .eq(Comment::getArticleId, article.getId())
+                .eq(Comment::getParentId, 0L)
                 .orderByAsc(Comment::getCreateTime));
-        if (all.isEmpty()) {
+        List<Comment> roots = rootPage.getRecords();
+        if (roots.isEmpty()) {
             return PageResult.empty(page, pageSize);
         }
 
-        Map<Long, Comment> byId = all.stream()
+        // 只加载当前页顶层评论及其回复（最多四级），不再扫描整篇文章的评论
+        List<Comment> loaded = new ArrayList<>(roots);
+        java.util.Set<Long> frontier = roots.stream().map(Comment::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        for (int depth = 0; depth < 4 && !frontier.isEmpty(); depth++) {
+            List<Comment> children = commentMapper.selectList(Wrappers.<Comment>lambdaQuery()
+                    .eq(Comment::getArticleId, article.getId())
+                    .in(Comment::getParentId, frontier));
+            if (children.isEmpty()) {
+                break;
+            }
+            loaded.addAll(children);
+            frontier = children.stream().map(Comment::getId)
+                    .collect(java.util.stream.Collectors.toSet());
+        }
+
+        Map<Long, Comment> byId = loaded.stream()
                 .collect(Collectors.toMap(Comment::getId, Function.identity()));
-        Map<Long, List<Comment>> byParent = all.stream()
+        Map<Long, List<Comment>> byParent = loaded.stream()
                 .collect(Collectors.groupingBy(c -> c.getParentId() == null ? 0L : c.getParentId()));
 
         // 已通过的节点 + 它们的祖先链可见；其余节点不展示
         Set<Long> visible = new HashSet<>();
-        for (Comment c : all) {
+        for (Comment c : loaded) {
             if (c.getStatus() != null && c.getStatus() == APPROVED) {
                 Long cursor = c.getId();
                 int guard = 0;
@@ -153,23 +173,19 @@ public class InteractionService {
         }
 
         Map<Long, User> users = userMapper.selectBatchIds(
-                        all.stream().map(Comment::getUserId).filter(Objects::nonNull).collect(Collectors.toSet()))
+                        loaded.stream().map(Comment::getUserId).filter(Objects::nonNull).collect(Collectors.toSet()))
                 .stream().collect(Collectors.toMap(User::getId, Function.identity()));
 
         Set<Long> authorIds = new HashSet<>(userRoleMapper.selectUserIdsByRoleCode("SUPER_ADMIN"));
 
-        List<Comment> roots = byParent.getOrDefault(0L, List.of()).stream()
-                .filter(c -> visible.contains(c.getId()))
-                .toList();
-        int total = roots.size();
-        int from = Math.min((page - 1) * pageSize, total);
-        int to = Math.min(from + pageSize, total);
-
-        List<CommentVO> records = new ArrayList<>(to - from);
-        for (Comment root : roots.subList(from, to)) {
-            records.add(toVO(root, byParent, users, currentUserId, authorIds, visible));
+        List<CommentVO> records = new ArrayList<>();
+        for (Comment root : roots) {
+            if (visible.contains(root.getId())) {
+                records.add(toVO(root, byParent, users, currentUserId, authorIds, visible));
+            }
         }
 
+        long total = rootPage.getTotal();
         long pages = pageSize == 0 ? 0 : (total + pageSize - 1) / pageSize;
         return new PageResult<>(records, total, page, pageSize, pages);
     }

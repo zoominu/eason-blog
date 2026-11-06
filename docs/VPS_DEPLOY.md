@@ -39,6 +39,17 @@
 | `/etc/nginx/sites-available/eason-blog.conf` | 站点配置（8080） |
 | `/var/backups/eason-blog/` | 每日备份（库 + uploads，保留 14 天） |
 
+生产必需环境变量（写在 `/etc/eason-blog.env`）：
+
+```ini
+SPRING_PROFILES_ACTIVE=prod
+JWT_SECRET=<至少 32 字节的随机串，prod 缺失会直接启动失败>
+TRUSTED_PROXIES=39.96.94.89,127.0.0.0/8,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,::1/128
+```
+
+`TRUSTED_PROXIES` 用逗号分隔，填前置代理（雷池/Nginx）的地址或网段；
+应用会从右往左跳过这些地址取真实客户端 IP，未配置时只信任本机与私有网段。
+
 普通用户：`easonblog`（系统用户），拥有 `/opt/eason-blog`；`/var/www` 归 `www-data`。
 
 > Nginx 站点里有两个容易踩的配置，务必保留：
@@ -53,7 +64,7 @@
 ## 3. 管理员与初始数据
 
 - 地址：`http://39.96.94.89/admin/`（雷池配置 80 后）
-- 账号：`admin@eason.blog` / `Admin123456`
+- 账号：`admin`（账号名登录，邮箱 `admin@eason.blog` 仅用于验证/订阅/找回密码） / `Admin123456`
 - **上线后请立即在「个人中心 → 安全」改密码**，并同步修改 `/etc/eason-blog.env` 里的 `BLOG_ADMIN_PASSWORD`（仅用于首次初始化，改完可留空）。
 
 数据库是全新的空库，只有 Flyway 初始化的表 + 角色权限 + 系统设置；文章/分类等需要自己添加。

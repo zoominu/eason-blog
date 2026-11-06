@@ -230,8 +230,7 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 | PATCH | `/admin/articles/{id}` | 整体更新（含标签全量替换） |
 | POST | `/admin/articles/{id}/publish` | 发布（草稿/下线 → 已发布，补写 `publishTime`） |
 | POST | `/admin/articles/{id}/offline` | 下线（仅已发布可调用，否则 400） |
-| POST | `/admin/articles/{id}/restore` | 从回收站恢复为草稿 |
-| DELETE | `/admin/articles/{id}` | 移入回收站（`status=3`，不物理删除） |
+| DELETE | `/admin/articles/{id}` | 物理删除，级联清理标签/专栏/评论/点赞/收藏/修订，slug 可重新使用 |
 
 创建 / 更新请求：
 
@@ -303,8 +302,10 @@ blog_token=<JWT>; Path=/; HttpOnly; SameSite=Lax; Max-Age=7200
 分类 `type`：`avatar`（头像）、`article_image`（文章图片）、`music`、`video`、`document`、`other`；
 不传时按 MIME/扩展名自动识别，后续新增类型只需扩展这个枚举。
 
-限制：扩展名白名单 `png/jpg/jpeg/gif/webp/svg/mp3/wav/ogg/m4a/flac/mp4/webm/mov/pdf/txt/md/zip`，
-MIME 需匹配对应类型；存储名随机（UUID），原始文件名只入库不落盘，防路径穿越。
+限制：扩展名白名单 `png/jpg/jpeg/gif/webp/mp3/wav/ogg/m4a/flac/mp4/webm/mov/pdf/txt/md/zip`，
+MIME 只接受 `image/*`、`audio/*`、`video/*`、`text/plain`、`text/markdown`、`application/pdf`、
+`application/zip`、`application/octet-stream`；**不接受 SVG**（避免同源脚本执行）。
+存储名随机（UUID），原始文件名只入库不落盘，防路径穿越。
 
 ### 4.6 日志
 
@@ -369,8 +370,8 @@ MIME 需匹配对应类型；存储名随机（UUID），原始文件名只入�
 | GET | `/admin/resources?type=` | 资源列表，可按类型筛选；返回每项被引用文章数 `articleCount` |
 | GET | `/admin/resources/{id}/references` | 该资源被哪些文章引用（id/title/slug/status） |
 
-文章删除不再进入回收站：`DELETE /admin/articles/{id}` 直接删除（后台与前台都不再出现）；
-只想让访客看不到时用 `POST /admin/articles/{id}/offline` 下线。
+文章删除不再进入回收站：`DELETE /admin/articles/{id}` 直接物理删除并级联清理关联数据，
+slug 释放后可重新使用；只想让访客看不到时用 `POST /admin/articles/{id}/offline` 下线。
 
 ### 4.9 邮件
 
@@ -426,8 +427,9 @@ body `{ "ids": [1,2,3], "approve": true }`，返回 `{ "updated": n }`。
 
 | 接口 | 限制 |
 | --- | --- |
-| `POST /auth/login` | 单 IP 60 次/分；单 IP+账号 10 次/分 |
+| `POST /auth/login` | 单 IP 60 次/分；单账号 10 次/分（不再绑定 IP） |
 | `POST /auth/register` | 单 IP 20 次/时；单邮箱 3 次/时 |
+| `GET /search` | 单 IP 30 次/分；关键词中的 `%` `_` 会被忽略，防止全表扫描 |
 | `POST /articles/{id}/comments` | 单用户 5 条/分 |
 | `POST /guestbook` | 单用户 3 条/5 分 |
 

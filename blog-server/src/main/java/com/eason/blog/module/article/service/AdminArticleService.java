@@ -15,6 +15,10 @@ import com.eason.blog.module.article.vo.AdminArticleListItemVO;
 import com.eason.blog.module.article.vo.AdminArticleVO;
 import com.eason.blog.module.category.entity.Category;
 import com.eason.blog.module.category.mapper.CategoryMapper;
+import com.eason.blog.module.column.mapper.ColumnArticleMapper;
+import com.eason.blog.module.comment.mapper.CommentMapper;
+import com.eason.blog.module.favorite.mapper.FavoriteMapper;
+import com.eason.blog.module.like.mapper.ArticleLikeMapper;
 import com.eason.blog.module.tag.entity.Tag;
 import com.eason.blog.module.tag.mapper.TagMapper;
 import org.springframework.stereotype.Service;
@@ -35,10 +39,8 @@ import java.util.stream.Collectors;
  * <p>状态机（设计文档 6.2）：
  * <pre>
  *   0 草稿 --publish--> 1 已发布 --offline--> 2 已下线 --publish--> 1
- *     ^                    |                     |
- *     +------ restore -----+---- delete --> 3 回收站
  * </pre>
- * 所有查询都带 is_deleted=0（逻辑删除由 MyBatis-Plus 自动附加）。</p>
+ * 删除是不可恢复的物理删除，会级联清理标签、专栏、评论、点赞、收藏与修订记录。</p>
  */
 @Service
 public class AdminArticleService {
@@ -46,23 +48,34 @@ public class AdminArticleService {
     private static final int DRAFT = 0;
     private static final int PUBLISHED = 1;
     private static final int OFFLINE = 2;
-    private static final int RECYCLED = 3;
 
     private final ArticleMapper articleMapper;
     private final ArticleTagMapper articleTagMapper;
     private final CategoryMapper categoryMapper;
     private final TagMapper tagMapper;
+    private final CommentMapper commentMapper;
+    private final FavoriteMapper favoriteMapper;
+    private final ArticleLikeMapper articleLikeMapper;
+    private final ColumnArticleMapper columnArticleMapper;
     private final com.eason.blog.common.mail.SubscriptionNotifyService subscriptionNotifyService;
 
     public AdminArticleService(ArticleMapper articleMapper,
                                ArticleTagMapper articleTagMapper,
                                CategoryMapper categoryMapper,
                                TagMapper tagMapper,
+                               CommentMapper commentMapper,
+                               FavoriteMapper favoriteMapper,
+                               ArticleLikeMapper articleLikeMapper,
+                               ColumnArticleMapper columnArticleMapper,
                                com.eason.blog.common.mail.SubscriptionNotifyService subscriptionNotifyService) {
         this.articleMapper = articleMapper;
         this.articleTagMapper = articleTagMapper;
         this.categoryMapper = categoryMapper;
         this.tagMapper = tagMapper;
+        this.commentMapper = commentMapper;
+        this.favoriteMapper = favoriteMapper;
+        this.articleLikeMapper = articleLikeMapper;
+        this.columnArticleMapper = columnArticleMapper;
         this.subscriptionNotifyService = subscriptionNotifyService;
     }
 
@@ -193,15 +206,27 @@ public class AdminArticleService {
         }
         article.setUpdateTime(LocalDateTime.now());
         articleMapper.updateById(article);
-        // 发布后异步通知订阅者，失败不影响发布
+        // 发布后异步通知订阅者；必须等事务提交后再发，避免回滚后仍发信
         final Article published = article;
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
+        Runnable notify = () -> {
             try {
                 subscriptionNotifyService.notifyPublished(published);
             } catch (RuntimeException ignored) {
                 // 邮件失败只记日志
             }
-        });
+        };
+        if (org.springframework.transaction.support.TransactionSynchronizationManager
+                .isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager
+                    .registerSynchronization(new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            java.util.concurrent.CompletableFuture.runAsync(notify);
+                        }
+                    });
+        } else {
+            java.util.concurrent.CompletableFuture.runAsync(notify);
+        }
     }
 
     @Transactional
@@ -223,18 +248,18 @@ public class AdminArticleService {
     @Transactional
     public void delete(Long id) {
         require(id);
-        articleMapper.deleteById(id);
-    }
-
-    @Transactional
-    public void restore(Long id) {
-        Article article = require(id);
-        if (article.getStatus() == null || article.getStatus() != RECYCLED) {
-            throw BusinessException.badRequest("只有回收站中的文章可以恢复");
-        }
-        article.setStatus(DRAFT);
-        article.setUpdateTime(LocalDateTime.now());
-        articleMapper.updateById(article);
+        // 先清理外键/关联数据，再物理删除文章，避免孤儿数据与 slug 唯一索引被占用
+        commentMapper.hardDeleteByArticleId(id);
+        favoriteMapper.delete(Wrappers.<com.eason.blog.module.favorite.entity.Favorite>lambdaQuery()
+                .eq(com.eason.blog.module.favorite.entity.Favorite::getArticleId, id));
+        articleLikeMapper.delete(Wrappers.<com.eason.blog.module.like.entity.ArticleLike>lambdaQuery()
+                .eq(com.eason.blog.module.like.entity.ArticleLike::getArticleId, id));
+        columnArticleMapper.delete(Wrappers.<com.eason.blog.module.column.entity.ColumnArticle>lambdaQuery()
+                .eq(com.eason.blog.module.column.entity.ColumnArticle::getArticleId, id));
+        articleTagMapper.delete(Wrappers.<ArticleTag>lambdaQuery()
+                .eq(ArticleTag::getArticleId, id));
+        articleMapper.deleteRevisions(id);
+        articleMapper.hardDelete(id);
     }
 
     private void applyFields(Article article, ArticleUpsertRequest request, Long excludeId) {

@@ -46,7 +46,6 @@ export const articleApi = {
   update: (id: number, payload: ArticleUpsertPayload) => patch<void>(`/admin/articles/${id}`, payload),
   publish: (id: number) => post<void>(`/admin/articles/${id}/publish`),
   offline: (id: number) => post<void>(`/admin/articles/${id}/offline`),
-  restore: (id: number) => post<void>(`/admin/articles/${id}/restore`),
   remove: (id: number) => del<void>(`/admin/articles/${id}`),
   importMarkdown: (form: FormData) =>
     post<MarkdownImportResult>('/admin/articles/import-markdown', form)

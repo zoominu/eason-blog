@@ -77,8 +77,10 @@ public class EmailTokenService {
         if (token.getExpiresAt() == null || token.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "链接已过期，请重新获取");
         }
-        token.setUsed(1);
-        emailTokenMapper.updateById(token);
+        if (emailTokenMapper.markUsed(token.getId()) != 1) {
+            // 并发请求已经抢先消费
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "链接无效或已使用");
+        }
         return token.getUserId();
     }
 

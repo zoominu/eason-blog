@@ -61,7 +61,7 @@ public class AuthController {
         if (!email.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
             throw com.eason.blog.common.exception.BusinessException.badRequest("邮箱格式不正确");
         }
-        String ip = clientIp(httpRequest);
+        String ip = com.eason.blog.common.web.ClientIp.of(httpRequest);
         rateLimiter.check("email-code-ip:" + ip, 20, 3600);
         rateLimiter.check("email-code:" + email, 1, 60);
         emailCodeService.send(email, com.eason.blog.module.auth.service.EmailCodeService.PURPOSE_REGISTER);
@@ -72,13 +72,12 @@ public class AuthController {
     public ApiResponse<UserVO> login(@Valid @RequestBody LoginRequest request,
                                      HttpServletRequest httpRequest,
                                      HttpServletResponse httpResponse) {
-        // 同一 IP 每分钟最多 10 次登录尝试，防撞库；真实用户正常操作远低于该阈值
-        // 两级限流：单 IP 总闸 + 单账号（IP+邮箱）防撞库
-        String ip = clientIp(httpRequest);
+        // 两级限流：单 IP 总闸 + 单账号防撞库（账号维度不绑定 IP，避免换 IP 绕过）
+        String ip = com.eason.blog.common.web.ClientIp.of(httpRequest);
         String identifier = request.account() != null && !request.account().isBlank()
                 ? request.account().trim() : (request.email() == null ? "" : request.email().trim());
         rateLimiter.check("login-ip:" + ip, 60, 60);
-        rateLimiter.check("login-account:" + ip + ":" + identifier.toLowerCase(), 10, 60);
+        rateLimiter.check("login-account:" + identifier.toLowerCase(), 10, 60);
 
         LoginResult result = authService.login(request, ip);
         writeAuthCookie(httpResponse, result.token(), Duration.ofMinutes(jwtService.expireMinutes()));
@@ -89,7 +88,7 @@ public class AuthController {
     public ApiResponse<UserVO> register(@Valid @RequestBody RegisterRequest request,
                                         HttpServletRequest httpRequest) {
         // 注册更敏感：单 IP 每小时 20 个账号 + 单邮箱每小时 3 次
-        String ip = clientIp(httpRequest);
+        String ip = com.eason.blog.common.web.ClientIp.of(httpRequest);
         rateLimiter.check("register-ip:" + ip, 20, 3600);
         rateLimiter.check("register-mail:" + request.email().toLowerCase(), 3, 3600);
 
@@ -111,7 +110,7 @@ public class AuthController {
     @PostMapping("/forgot-password")
     public ApiResponse<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request,
                                             HttpServletRequest httpRequest) {
-        String ip = clientIp(httpRequest);
+        String ip = com.eason.blog.common.web.ClientIp.of(httpRequest);
         rateLimiter.check("forgot-ip:" + ip, 10, 3600);
         rateLimiter.check("forgot-mail:" + request.email().toLowerCase(), 3, 3600);
         authService.requestPasswordReset(request.email());
@@ -146,13 +145,5 @@ public class AuthController {
                 .maxAge(maxAge)
                 .build();
         response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
-    }
-
-    private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 }

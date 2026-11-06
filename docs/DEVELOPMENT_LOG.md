@@ -4,6 +4,33 @@
 
 ---
 
+## 2026-11-06 · 安全审计修复（SEC-01/02/03/06/07、BUG-01~05）
+
+| 编号 | 修复 |
+| --- | --- |
+| SEC-01 | `application-prod.yml` 改为 `${JWT_SECRET}`（缺失即启动失败）；`JwtService` 在非 dev/test 环境拒绝仓库默认密钥 |
+| SEC-02 | `ClientIp` 改为从右往左跳过可信代理（`TRUSTED_PROXIES` 环境变量），AuthController 统一使用；生产关闭 Spring 的 `forward-headers-strategy`；登录账号限流不再绑定 IP |
+| SEC-03 | 限流器改为定长窗口计数 + 按 key 自身窗口定期清理，不再无界增长 |
+| SEC-06 | 邮箱 token 改为 `UPDATE ... WHERE used=0` 原子消费 |
+| SEC-07 | 上传移除 `svg`，MIME 只接受明确白名单（拒绝 `text/html` 等） |
+| BUG-01 | 删除死掉的回收站 `restore` 接口与常量，删除语义明确为不可恢复 |
+| BUG-02 | 删除改为物理删除并级联清理标签/专栏/评论/点赞/收藏/修订；V12 清理历史软删文章，slug 可复用 |
+| BUG-03 | 发布通知改为事务 `afterCommit` 后再异步发送 |
+| BUG-04 | 评论改为数据库分页 + 仅加载当前页回复树 |
+| BUG-05 | 搜索过滤 `%`/`_` 并加 IP 限流（30 次/分） |
+
+### 验证
+
+```
+61 个后端测试通过
+删除后关联行：article/comment/like/favorite 均为 0；同 slug 重建返回 200
+SVG 上传返回 400「不支持的文件类型：svg」
+搜索 keyword=% / _ 返回 0 条
+评论 page=1&size=1：total=3，records=1
+伪造 XFF 203.0.113.9：last_login_ip 记录为 203.0.113.9（可信代理链解析）
+Flyway 最新版本 12
+```
+
 ## 2026-11-05 · 账号登录、账号名唯一不可改、封面放大
 
 | 需求 | 处理 |

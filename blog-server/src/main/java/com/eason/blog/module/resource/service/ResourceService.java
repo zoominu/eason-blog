@@ -39,7 +39,7 @@ import java.util.UUID;
  * <ul>
  *   <li>限制 MIME 与扩展名白名单，拒绝可执行脚本；</li>
  *   <li>存储名随机生成，不使用用户原始文件名，防路径穿越；</li>
- *   <li>大小上限 20MB（与 Nginx client_max_body_size 对齐）；</li>
+ *   <li>大小上限 200MB（与 Nginx client_max_body_size 210m 对齐）；</li>
  *   <li>上传目录不参与执行，Nginx 只作为静态资源返回。</li>
  * </ul>
  * 资源按 {@code type} 分类：avatar / article_image / music / video / document / other，
@@ -59,12 +59,14 @@ public class ResourceService {
 
     private static final long MAX_SIZE = 200L * 1024 * 1024;
     private static final Set<String> ALLOWED_EXT = Set.of(
-            "png", "jpg", "jpeg", "gif", "webp", "svg",
+            "png", "jpg", "jpeg", "gif", "webp",
             "mp3", "wav", "ogg", "m4a", "flac",
             "mp4", "webm", "mov",
             "pdf", "txt", "md", "zip");
     private static final Set<String> ALLOWED_MIME_PREFIX = Set.of(
-            "image/", "audio/", "video/", "text/", "application/pdf", "application/zip",
+            "image/", "audio/", "video/");
+    private static final Set<String> ALLOWED_MIME_EXACT = Set.of(
+            "text/plain", "text/markdown", "application/pdf", "application/zip",
             "application/octet-stream");
     private static final DateTimeFormatter MONTH = DateTimeFormatter.ofPattern("yyyy/MM");
 
@@ -100,7 +102,7 @@ public class ResourceService {
             throw BusinessException.badRequest("不支持的文件类型：" + ext);
         }
         String mime = file.getContentType() == null ? "" : file.getContentType().toLowerCase(Locale.ROOT);
-        if (ALLOWED_MIME_PREFIX.stream().noneMatch(mime::startsWith)) {
+        if (!allowedMime(mime)) {
             throw BusinessException.badRequest("不支持的文件 MIME 类型");
         }
 
@@ -155,7 +157,7 @@ public class ResourceService {
             throw BusinessException.badRequest("文件为空");
         }
         if (bytes.length > MAX_SIZE) {
-            throw BusinessException.badRequest("文件不能超过 20MB");
+            throw BusinessException.badRequest("文件不能超过 200MB");
         }
         String original = StringUtils.hasText(originalName)
                 ? Paths.get(originalName.replace('\\', '/')).getFileName().toString()
@@ -165,7 +167,7 @@ public class ResourceService {
             throw BusinessException.badRequest("不支持的文件类型：" + ext);
         }
         String normalizedMime = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
-        if (ALLOWED_MIME_PREFIX.stream().noneMatch(normalizedMime::startsWith)) {
+        if (!allowedMime(normalizedMime)) {
             throw BusinessException.badRequest("不支持的文件 MIME 类型");
         }
 
@@ -275,7 +277,7 @@ public class ResourceService {
             case "mp3", "wav", "ogg", "m4a", "flac" -> TYPE_MUSIC;
             case "mp4", "webm", "mov" -> TYPE_VIDEO;
             case "pdf", "txt", "md", "zip" -> TYPE_DOCUMENT;
-            case "png", "jpg", "jpeg", "gif", "webp", "svg" -> TYPE_ARTICLE_IMAGE;
+            case "png", "jpg", "jpeg", "gif", "webp" -> TYPE_ARTICLE_IMAGE;
             default -> TYPE_OTHER;
         };
     }
@@ -283,6 +285,12 @@ public class ResourceService {
     private String extensionOf(String name) {
         int dot = name.lastIndexOf('.');
         return dot < 0 ? "" : name.substring(dot + 1).toLowerCase(Locale.ROOT);
+    }
+
+    /** 只放行明确的 MIME，避免 text/html、image/svg+xml 等可执行内容混入。 */
+    private static boolean allowedMime(String mime) {
+        return ALLOWED_MIME_PREFIX.stream().anyMatch(mime::startsWith)
+                || ALLOWED_MIME_EXACT.contains(mime);
     }
 
     private String sha256(Path file) {

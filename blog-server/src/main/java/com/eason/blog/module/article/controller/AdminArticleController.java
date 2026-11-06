@@ -102,15 +102,8 @@ public class AdminArticleController {
         return ApiResponse.success();
     }
 
-    @PostMapping("/{id}/restore")
-    @Audit(module = "article", action = "恢复文章")
-    public ApiResponse<Void> restore(@PathVariable Long id) {
-        adminArticleService.restore(id);
-        return ApiResponse.success();
-    }
-
     @DeleteMapping("/{id}")
-    @Audit(module = "article", action = "移入回收站")
+    @Audit(module = "article", action = "删除文章")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         adminArticleService.delete(id);
         return ApiResponse.success();

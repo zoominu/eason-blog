@@ -45,7 +45,12 @@ public class SearchService {
         if (!StringUtils.hasText(keyword)) {
             return PageResult.empty(page, size);
         }
-        String kw = keyword.trim();
+        // 去掉 LIKE 通配符，避免用户输入 % / _ 触发全表大字段扫描
+        String kw = keyword.trim().replace('%', ' ').replace('_', ' ')
+                .replaceAll("\\s+", " ").trim();
+        if (kw.isEmpty()) {
+            return PageResult.empty(page, size);
+        }
 
         Page<Article> result = new Page<>(Math.max(page, 1), Math.min(Math.max(size, 1), MAX_SIZE));
         articleMapper.selectPage(result, Wrappers.<Article>lambdaQuery()

@@ -2,6 +2,7 @@ package com.eason.blog.module.article.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.eason.blog.module.article.entity.Article;
+import org.apache.ibatis.annotations.Delete;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
@@ -18,6 +19,13 @@ public interface ArticleMapper extends BaseMapper<Article> {
      */
     @Update("UPDATE blog_article SET view_count = GREATEST(view_count + 1, 0) WHERE id = #{id}")
     int incrementViewCount(@Param("id") Long id);
+
+    /** 物理删除文章，释放 slug 唯一索引；调用方需先清理外键关联数据。 */
+    @Delete("DELETE FROM blog_article WHERE id = #{id}")
+    int hardDelete(@Param("id") Long id);
+
+    @Delete("DELETE FROM blog_article_revision WHERE article_id = #{id}")
+    int deleteRevisions(@Param("id") Long id);
 
     /** 点赞数增减：GREATEST 防御负数，避免并发/重复操作把计数打成负值。 */
     @Update("UPDATE blog_article SET like_count = GREATEST(like_count + #{delta}, 0) WHERE id = #{id}")

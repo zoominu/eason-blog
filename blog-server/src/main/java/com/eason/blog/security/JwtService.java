@@ -4,6 +4,9 @@ import com.eason.blog.config.AppProperties;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
@@ -31,11 +34,23 @@ public class JwtService {
     private final long expireMinutes;
 
     public JwtService(AppProperties properties) {
+        this(properties, null);
+    }
+
+    @Autowired
+    public JwtService(AppProperties properties, Environment environment) {
         String secret = properties.jwt().secret();
         byte[] bytes = secret == null ? new byte[0] : secret.getBytes(StandardCharsets.UTF_8);
         if (bytes.length < MIN_SECRET_BYTES) {
             throw new IllegalStateException(
                     "JWT_SECRET 太短：至少需要 32 字节，请通过环境变量提供随机密钥");
+        }
+        // 非开发/测试环境禁止使用仓库里的公开默认值，避免“能启动但可被伪造”
+        boolean devOrTest = environment != null
+                && environment.acceptsProfiles(Profiles.of("dev", "test"));
+        if (!devOrTest && secret.startsWith("dev-only-change-me")) {
+            throw new IllegalStateException(
+                    "生产环境不能使用默认 JWT_SECRET，请通过环境变量提供随机密钥");
         }
         this.key = Keys.hmacShaKeyFor(bytes);
         this.expireMinutes = Math.max(1, properties.jwt().expireMinutes());

@@ -414,7 +414,7 @@ Flyway 负责建表与基础字典。初始化角色、权限、默认分类可�
 
 GET /admin/dashboard：仪表盘统计。
 
-GET/POST /admin/articles；GET/PATCH/DELETE /admin/articles/{id}；POST /admin/articles/{id}/publish、/offline、/restore。
+GET/POST /admin/articles；GET/PATCH/DELETE /admin/articles/{id}；POST /admin/articles/{id}/publish、/offline。
 
 GET/POST/PATCH/DELETE /admin/categories、/admin/tags、/admin/columns。
 
