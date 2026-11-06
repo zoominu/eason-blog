@@ -1,5 +1,8 @@
 package com.eason.blog.module.column.dto;
 
+/**
+ * 专栏创建/更新请求体：名称、slug、封面、简介、排序；slug 冲突由 Service 处理。
+ */
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;

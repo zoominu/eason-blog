@@ -1,3 +1,9 @@
+/**
+ * 后台 API 定义。
+ *
+ * <p>所有后台接口都以 `/admin/` 开头，必须携带登录 Cookie 且要求 SUPER_ADMIN；
+ * 返回结构与前台一致（`{code,message,data}`），错误由 http 层统一抛出。</p>
+ */
 import instance, { del, get, patch, post } from './http'
 import type {
   AdminArticle,

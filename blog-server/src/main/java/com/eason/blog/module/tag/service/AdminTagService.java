@@ -1,5 +1,8 @@
 package com.eason.blog.module.tag.service;
 
+/**
+ * 后台标签服务：slug 去重、删除前检查文章引用，避免产生孤儿关联。
+ */
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.eason.blog.common.db.RowUtils;
 import com.eason.blog.common.exception.BusinessException;

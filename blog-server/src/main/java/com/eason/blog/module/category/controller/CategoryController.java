@@ -1,5 +1,8 @@
 package com.eason.blog.module.category.controller;
 
+/**
+ * 公开分类接口：只读，返回分类及其公开文章数；不暴露后台字段。
+ */
 import com.eason.blog.common.response.ApiResponse;
 import com.eason.blog.common.response.PageResult;
 import com.eason.blog.module.article.dto.ArticleQuery;

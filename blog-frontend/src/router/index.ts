@@ -1,3 +1,10 @@
+/**
+ * 前台路由表。
+ *
+ * <p>除 404 外全部挂在 `MainLayout` 下，共享导航与页脚；认证页通过
+ * `MainLayout` 判断路由名切换全屏壁纸。`requiresAuth` 的路由会在 beforeEach
+ * 里重新请求 `/auth/me`，避免只依赖前端内存判断登录态。</p>
+ */
 import { createRouter, createWebHistory } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
 import { useUserStore } from '@/stores/user'
@@ -60,6 +67,7 @@ const router = createRouter({
 
 // 路由守卫：不能用 document.cookie 判断登录态 —— token 是 HttpOnly，JS 读不到。
 // 正确做法是让 store 调 /auth/me 拿用户态（后端返回 401 时视为未登录）。
+// 路由守卫：需要登录的页面先请求 /auth/me，未登录时带 redirect 回登录页
 router.beforeEach(async (to) => {
   if (!to.meta.requiresAuth) return true
 

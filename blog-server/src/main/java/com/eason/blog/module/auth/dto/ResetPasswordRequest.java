@@ -1,5 +1,8 @@
 package com.eason.blog.module.auth.dto;
 
+/**
+ * 重置密码请求体：一次性 token + 新密码；密码强度由 Service 统一校验。
+ */
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;

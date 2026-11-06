@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   把当前构建产物发布到 VPS（39.96.94.89）的源站端口部署。
 
@@ -22,7 +22,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-$jar = Join-Path $root 'blog-server/target/blog-server-0.1.0-SNAPSHOT.jar'
+$jar = Join-Path $root 'blog-server/target/blog-server-1.0.0.jar'
 $frontend = Join-Path $root 'blog-frontend/dist'
 $admin = Join-Path $root 'blog-admin/dist'
 foreach ($p in @($jar, $frontend, $admin)) {

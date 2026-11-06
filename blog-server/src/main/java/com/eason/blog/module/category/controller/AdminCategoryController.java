@@ -1,5 +1,8 @@
 package com.eason.blog.module.category.controller;
 
+/**
+ * 后台分类管理接口：增删改查；删除前会检查子分类与文章引用，全部要求 SUPER_ADMIN。
+ */
 import com.eason.blog.common.response.ApiResponse;
 import com.eason.blog.module.category.dto.CategoryRequest;
 import com.eason.blog.module.category.service.AdminCategoryService;

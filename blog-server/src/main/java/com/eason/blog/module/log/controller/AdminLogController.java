@@ -1,5 +1,8 @@
 package com.eason.blog.module.log.controller;
 
+/**
+ * 后台日志接口：登录日志与操作日志分页查询，只读，要求 SUPER_ADMIN。
+ */
 import com.eason.blog.common.response.ApiResponse;
 import com.eason.blog.common.response.PageResult;
 import com.eason.blog.module.log.service.LogQueryService;

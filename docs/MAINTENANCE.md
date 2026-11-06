@@ -55,7 +55,7 @@ node scripts/seed-vm-demo.mjs http://192.168.245.131
 | --- | --- | --- | --- |
 | JDK | OpenJDK 21.0.12 | — | 系统包 |
 | MySQL | 8.0.46 | 3306（仅 127.0.0.1） | `mysql.service` |
-| 后端 Spring Boot | 0.1.0-SNAPSHOT | 8080（仅本机） | `eason-blog.service` |
+| 后端 Spring Boot | 1.0.0 | 8080（仅本机） | `eason-blog.service` |
 | Nginx | 1.24.0 | 80（对外） | `nginx.service` |
 | 前台 / 后台 | Vue 3 静态文件 | 80 | 由 Nginx 直接返回 |
 

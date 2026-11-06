@@ -1,5 +1,8 @@
 package com.eason.blog.module.tag.controller;
 
+/**
+ * 后台标签管理接口：增删改查；删除前检查文章引用，要求 SUPER_ADMIN。
+ */
 import com.eason.blog.common.response.ApiResponse;
 import com.eason.blog.module.tag.dto.TagRequest;
 import com.eason.blog.module.tag.service.AdminTagService;

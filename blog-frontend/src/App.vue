@@ -1,4 +1,10 @@
 <script setup lang="ts">
+/**
+ * 应用根组件：只做三件事——渲染路由、挂全局 Toast、启动时恢复登录态。
+ *
+ * <p>登录态由 HttpOnly Cookie 承载，前端无法直接读取，所以每次刷新都要
+ * 调一次 `/auth/me`；失败视为未登录，不阻塞页面渲染。</p>
+ */
 import { onMounted } from 'vue'
 import ToastHost from '@/components/ToastHost.vue'
 import { useUserStore } from '@/stores/user'

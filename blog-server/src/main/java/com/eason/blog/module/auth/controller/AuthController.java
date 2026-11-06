@@ -68,6 +68,12 @@ public class AuthController {
         return ApiResponse.success();
     }
 
+    /**
+     * 账号密码登录。
+     *
+     * <p>优先使用 account（账号名）；为兼容旧客户端/管理员，email 字段仍可作为兜底。
+     * 成功后下发 HttpOnly Cookie，响应体不返回 token。失败统一 401，避免账号枚举。</p>
+     */
     @PostMapping("/login")
     public ApiResponse<UserVO> login(@Valid @RequestBody LoginRequest request,
                                      HttpServletRequest httpRequest,
@@ -84,6 +90,10 @@ public class AuthController {
         return ApiResponse.success(result.user());
     }
 
+    /**
+     * 注册：账号名唯一且注册后不可修改；邮箱只用于验证码/订阅/找回密码。
+     * 开启邮件功能时必须携带有效邮箱验证码，否则由 Service 拒绝。
+     */
     @PostMapping("/register")
     public ApiResponse<UserVO> register(@Valid @RequestBody RegisterRequest request,
                                         HttpServletRequest httpRequest) {
@@ -95,6 +105,12 @@ public class AuthController {
         return ApiResponse.success(authService.register(request));
     }
 
+    /**
+     * 退出登录：用同名空值 + Max-Age=0 覆盖 Cookie。
+     *
+     * <p>当前 SecurityConfig 要求该接口已认证；token 过期时前端调用会得到 401，
+     * 但浏览器侧 Cookie 已过期，不影响安全。</p>
+     */
     @PostMapping("/logout")
     public ApiResponse<Void> logout(HttpServletResponse httpResponse) {
         // 用同名空值 + Max-Age=0 覆盖，确保浏览器立即删除
@@ -102,11 +118,17 @@ public class AuthController {
         return ApiResponse.success();
     }
 
+    /** 当前登录用户资料；未登录由 Security 入口返回 401。 */
     @GetMapping("/me")
     public ApiResponse<UserVO> me(@AuthenticationPrincipal UserPrincipal principal) {
         return ApiResponse.success(authService.currentUser(principal.getId()));
     }
 
+    /**
+     * 请求重置密码邮件。
+     *
+     * <p>邮箱不存在也返回成功，防止被用来探测注册状态；邮件链接 30 分钟内有效。</p>
+     */
     @PostMapping("/forgot-password")
     public ApiResponse<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request,
                                             HttpServletRequest httpRequest) {
@@ -117,24 +139,31 @@ public class AuthController {
         return ApiResponse.success();
     }
 
+    /** 用一次性 token 重置密码；成功后 token 作废，旧登录态由 token_version 失效。 */
     @PostMapping("/reset-password")
     public ApiResponse<Void> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
         authService.resetPassword(request.token(), request.newPassword());
         return ApiResponse.success();
     }
 
+    /** 验证邮箱（一次性 token）。 */
     @PostMapping("/verify-email")
     public ApiResponse<Void> verifyEmail(@Valid @RequestBody TokenRequest request) {
         authService.verifyEmail(request.token());
         return ApiResponse.success();
     }
 
+    /** 重新发送验证邮件；需登录，避免匿名触发邮件轰炸。 */
     @PostMapping("/resend-verification")
     public ApiResponse<Void> resendVerification(@AuthenticationPrincipal UserPrincipal principal) {
         authService.resendVerification(principal.getId());
         return ApiResponse.success();
     }
 
+    /**
+     * 统一下发认证 Cookie：HttpOnly + SameSite + 可选 Secure。
+     * maxAge=0 时即删除 Cookie（登出）；生产 HTTPS 应把 COOKIE_SECURE 设为 true。
+     */
     private void writeAuthCookie(HttpServletResponse response, String value, Duration maxAge) {
         AppProperties.Jwt jwt = properties.jwt();
         ResponseCookie cookie = ResponseCookie.from(jwt.cookieName(), value)

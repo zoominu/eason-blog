@@ -1,5 +1,8 @@
 package com.eason.blog.module.tag.dto;
 
+/**
+ * 标签创建/更新请求体：名称 + 可选 slug。
+ */
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;

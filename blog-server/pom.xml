@@ -13,7 +13,7 @@
 
     <groupId>com.eason</groupId>
     <artifactId>blog-server</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>blog-server</name>
     <description>Eason Blog backend - modular monolith</description>
 

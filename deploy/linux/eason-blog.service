@@ -1,0 +1,30 @@
+[Unit]
+Description=Eason Blog backend (Spring Boot)
+Documentation=file:///opt/eason-blog/docs/LINUX_DEPLOY.md
+After=network-online.target mysql.service
+Wants=network-online.target mysql.service
+
+[Service]
+Type=simple
+User=easonblog
+Group=easonblog
+WorkingDirectory=/opt/eason-blog
+EnvironmentFile=/etc/eason-blog.env
+
+# 1GB 内存机器可用：-Xms96m -Xmx256m -Xss512k -XX:MaxMetaspaceSize=160m -XX:+UseSerialGC
+ExecStart=/usr/bin/java -Xms128m -Xmx512m -Xss512k -XX:MaxMetaspaceSize=192m -XX:+UseSerialGC -jar /opt/eason-blog/app/app.jar
+
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+
+# 基础加固：只允许写 data/uploads 与 logs
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/eason-blog/data /opt/eason-blog/logs
+
+[Install]
+WantedBy=multi-user.target

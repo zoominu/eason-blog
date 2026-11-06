@@ -7,6 +7,32 @@
 > 需求基线：`docs/PROJECT_DESIGN.md`（由设计文档 DOCX 转换并在仓库内维护）。
 > 开发方式：严格按 P0–P6 分阶段交付，当前进度见 `docs/DEVELOPMENT_LOG.md`。
 
+## 版本与发布
+
+当前版本：**v1.0.0**（后端 `pom.xml`、前台/后台 `package.json` 同步）。
+
+构建产物：
+
+```bash
+# 后端（Java 21）
+mvn -f blog-server/pom.xml clean package -DskipTests
+# 前台
+cd blog-frontend && pnpm install && pnpm build
+# 后台（注意 base=/admin/）
+cd blog-admin && ADMIN_BASE=/admin/ pnpm install && pnpm build
+```
+
+Linux 从零部署请直接看 **[docs/LINUX_DEPLOY.md](docs/LINUX_DEPLOY.md)**：
+包含 MySQL、systemd、Nginx、环境变量、HTTPS/WAF、升级回滚、备份恢复与排障。
+发布包目录与校验方式见该文档第 16 节。
+
+代码注释约定：
+
+- 后端：类/接口用 Javadoc 说明职责与安全边界；Service 的公共方法说明事务、边界条件与异常；
+  Controller 只写“入参/权限/返回”，业务细节留在 Service。
+- 前端：API 层注释路径与入参，Store 注释状态来源与失效时机，复杂组件注释交互状态机。
+- 不要写“给 X 赋值”这类复述代码的注释；优先解释**为什么**这么做、**不这么做**会怎样。
+
 ---
 
 ## 技术栈

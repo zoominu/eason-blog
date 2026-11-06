@@ -1,5 +1,8 @@
 package com.eason.blog.module.auth.dto;
 
+/**
+ * 找回密码请求体：只接收邮箱；邮箱不存在时服务端也返回成功，避免被用来枚举注册状态。
+ */
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 

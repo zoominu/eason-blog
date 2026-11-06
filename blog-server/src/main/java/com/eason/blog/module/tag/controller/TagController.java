@@ -1,5 +1,8 @@
 package com.eason.blog.module.tag.controller;
 
+/**
+ * 公开标签接口：只读列表与标签下公开文章。
+ */
 import com.eason.blog.common.response.ApiResponse;
 import com.eason.blog.common.response.PageResult;
 import com.eason.blog.module.article.service.ArticleService;

@@ -1,5 +1,8 @@
 package com.eason.blog.module.system.controller;
 
+/**
+ * 公开站点接口：站点配置、统计、公告等只读数据，供前台页脚/首页使用。
+ */
 import com.eason.blog.common.response.ApiResponse;
 import com.eason.blog.module.system.service.SiteService;
 import org.springframework.web.bind.annotation.GetMapping;

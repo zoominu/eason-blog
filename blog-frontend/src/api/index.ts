@@ -1,3 +1,12 @@
+/**
+ * 前台 API 定义。
+ *
+ * <p>这里只声明“路径 + 入参 + 返回类型”，不写业务逻辑；所有请求最终走 {@link get/post/patch/del}，
+ * 由 `http.ts` 统一处理 baseURL、Cookie 和错误文案。页面/组件应调用这些方法而不是直接 axios。</p>
+ *
+ * <p>命名约定：<code>xxxApi.verbAction()</code>，例如 <code>articleApi.detail(slug)</code>；
+ * 返回类型来自 `types.ts`，与后端 VO 字段保持一致。</p>
+ */
 import { del, get, patch, post } from './http'
 import type {
   ArticleDetail,
@@ -23,6 +32,7 @@ export interface ArticleListParams {
   sort?: 'latest' | 'popular'
 }
 
+/** 文章：分页、最新、推荐、详情；只返回已发布且公开的文章。 */
 export const articleApi = {
   page: (params: ArticleListParams) => get<PageResult<ArticleSummary>>('/articles', { ...params }),
   latest: (limit = 5) => get<ArticleSummary[]>('/articles/latest', { limit }),
@@ -30,6 +40,7 @@ export const articleApi = {
   detail: (slug: string) => get<ArticleDetail>(`/articles/${slug}`)
 }
 
+/** 分类 / 标签 / 专栏 / 归档等只读内容。 */
 export const taxonomyApi = {
   categories: () => get<Category[]>('/categories'),
   category: (slug: string) => get<Category>(`/categories/${slug}`),
@@ -44,11 +55,18 @@ export const taxonomyApi = {
   columnArticles: (slug: string) => get<ArticleSummary[]>(`/columns/${slug}/articles`)
 }
 
+/** 站点配置与统计（页脚、关于页、首页概览用）。 */
 export const siteApi = {
   config: () => get<SiteConfig>('/site/config'),
   statistics: () => get<SiteStatistics>('/site/statistics')
 }
 
+/**
+ * 认证与个人资料。
+ *
+ * <p>登录用账号名（account）；邮箱只用于注册验证码、找回密码、订阅。
+ * 登录态由服务端 HttpOnly Cookie 维护，前端不保存 token。</p>
+ */
 export const authApi = {
   login: (account: string, password: string) => post<User>('/auth/login', { account, password }),
   register: (payload: { email: string; password: string; username?: string; nickname?: string; code?: string }) =>

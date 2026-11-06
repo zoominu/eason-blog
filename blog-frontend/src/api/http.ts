@@ -28,21 +28,25 @@ instance.interceptors.response.use(
   }
 )
 
+/** GET 请求：params 会拼到 query string，返回值已解包为 data。 */
 export async function get<T>(url: string, params?: Record<string, unknown>): Promise<T> {
   const response = await instance.get<ApiResponse<T>>(url, { params })
   return response.data.data
 }
 
+/** POST 请求；第三个参数可覆盖 timeout（例如上传大文件）。 */
 export async function post<T>(url: string, body?: unknown, config?: AxiosRequestConfig): Promise<T> {
   const response = await instance.post<ApiResponse<T>>(url, body ?? {}, config)
   return response.data.data
 }
 
+/** PATCH 请求：当前用于资料更新、通知已读等部分更新。 */
 export async function patch<T>(url: string, body?: unknown): Promise<T> {
   const response = await instance.patch<ApiResponse<T>>(url, body ?? {})
   return response.data.data
 }
 
+/** DELETE 请求。 */
 export async function del<T>(url: string): Promise<T> {
   const response = await instance.delete<ApiResponse<T>>(url)
   return response.data.data

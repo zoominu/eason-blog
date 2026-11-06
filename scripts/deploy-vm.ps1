@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
   构建并发布 Eason Blog 到 Linux 虚拟机（Ubuntu + systemd + Nginx）。
 
@@ -66,7 +66,7 @@ if (-not $SkipBuild) {
 Write-Host '== 组装发布包 ==' -ForegroundColor Cyan
 if (Test-Path $bundle) { Remove-Item -Recurse -Force $bundle }
 New-Item -ItemType Directory -Path $bundle | Out-Null
-Copy-Item (Join-Path $root 'blog-server\target\blog-server-0.1.0-SNAPSHOT.jar') (Join-Path $bundle 'blog-server.jar')
+Copy-Item (Join-Path $root 'blog-server\target\blog-server-1.0.0.jar') (Join-Path $bundle 'blog-server.jar')
 Copy-Item -Recurse (Join-Path $root 'blog-frontend\dist') (Join-Path $bundle 'frontend')
 Copy-Item -Recurse (Join-Path $root 'blog-admin\dist') (Join-Path $bundle 'admin')
 Copy-Item (Join-Path $root 'deploy\vm\install.sh') $bundle

@@ -1,5 +1,8 @@
 package com.eason.blog.module.tag.service;
 
+/**
+ * 公开标签服务：只返回有公开文章的标签/文章列表。
+ */
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.eason.blog.common.db.RowUtils;
 import com.eason.blog.module.article.mapper.ArticleMapper;

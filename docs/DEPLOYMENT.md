@@ -39,7 +39,7 @@ FLUSH PRIVILEGES;
 
 ```bash
 # 后端
-cd blog-server && mvn -B -DskipTests package      # target/blog-server-0.1.0-SNAPSHOT.jar
+cd blog-server && mvn -B -DskipTests package      # target/blog-server-1.0.0.jar
 
 # 前台（根路径部署）
 cd blog-frontend && pnpm install && pnpm build    # dist/
