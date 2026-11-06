@@ -4,6 +4,19 @@
 
 ---
 
+## 2026-11-06 · v1.0.0 发布打包
+
+- 版本统一：后端 `pom.xml`、前台/后台 `package.json`、`VERSION` 全部为 `1.0.0`。
+- 新增 `docs/LINUX_DEPLOY.md`：从零安装 Java/MySQL/Nginx、systemd、环境变量、HTTPS/WAF、
+  升级回滚、备份恢复、排障与上线安全清单。
+- 新增 `deploy/linux/`：`eason-blog.service`、`eason-blog.env.example`、`nginx-eason-blog.conf`。
+- 新增 `docs/RELEASE_NOTES_v1.0.0.md`（功能范围、升级注意事项、已知限制）。
+- 注释补齐：165 个 Java 类全部有类级注释；核心 Controller/Service 补方法级说明；
+  前台/后台 32 个页面/组件补文件级注释；API/Store/Router 说明职责与状态来源。
+- 发布产物：`eason-blog-v1.0.0-linux.tar.gz`、`eason-blog-1.0.0-source.zip`，
+  包内 `SHA256SUMS` 校验通过。
+- 验证：后端编译通过、61 个测试通过；前台/后台 `vue-tsc` 通过；发布包 99 个文件逐一校验。
+
 ## 2026-11-06 · 安全审计修复（SEC-01/02/03/06/07、BUG-01~05）
 
 | 编号 | 修复 |

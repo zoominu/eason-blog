@@ -24,7 +24,8 @@ cd blog-admin && ADMIN_BASE=/admin/ pnpm install && pnpm build
 
 Linux 从零部署请直接看 **[docs/LINUX_DEPLOY.md](docs/LINUX_DEPLOY.md)**：
 包含 MySQL、systemd、Nginx、环境变量、HTTPS/WAF、升级回滚、备份恢复与排障。
-发布包目录与校验方式见该文档第 16 节。
+发布包目录与校验方式见该文档第 16 节；功能与升级注意事项见
+**[docs/RELEASE_NOTES_v1.0.0.md](docs/RELEASE_NOTES_v1.0.0.md)**。
 
 代码注释约定：
 
