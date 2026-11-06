@@ -1,3 +1,6 @@
+<!--
+  文章归档列表：分页、分类/关键词筛选、排序切换，空结果走 EmptyState。
+-->
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

@@ -1,3 +1,6 @@
+<!--
+  后台专栏管理：专栏增删改查与文章关联。
+-->
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

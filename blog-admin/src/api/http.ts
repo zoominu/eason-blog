@@ -1,3 +1,6 @@
+/**
+ * 后台请求封装：baseURL=/api/v1、携带 Cookie、统一解包与错误文案。
+ */
 import axios from 'axios'
 import type { ApiResponse } from './types'
 

@@ -1,3 +1,6 @@
+<!--
+  隐私政策静态页：说明收集的信息、用途、Cookie、共享、保留期与用户权利。
+-->
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { setPageTitle } from '@/utils/seo'

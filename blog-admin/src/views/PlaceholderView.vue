@@ -1,3 +1,6 @@
+<!--
+  占位页：未实现模块的统一提示，避免侧边栏链接 404。
+-->
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'

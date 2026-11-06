@@ -1,3 +1,6 @@
+<!--
+  后台登录页：账号 + 密码，登录后校验 SUPER_ADMIN 角色再进入控制台。
+-->
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

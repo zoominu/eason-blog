@@ -1,3 +1,6 @@
+<!--
+  后台主布局：侧边导航 + 顶栏 + 内容区；移动端折叠菜单，路由切换高亮。
+-->
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

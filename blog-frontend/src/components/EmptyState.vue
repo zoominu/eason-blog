@@ -1,3 +1,6 @@
+<!--
+  通用空状态占位：列表/搜索无结果时展示图标、标题和补充说明，避免页面空白。
+-->
 <script setup lang="ts">
 import { FileText } from 'lucide-vue-next'
 

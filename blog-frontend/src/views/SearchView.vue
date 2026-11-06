@@ -1,3 +1,6 @@
+<!--
+  搜索结果页：关键词来自 query，分页展示已发布公开文章，空结果给出提示。
+-->
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

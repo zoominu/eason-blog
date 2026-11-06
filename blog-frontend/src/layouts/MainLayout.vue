@@ -1,3 +1,6 @@
+<!--
+  前台主布局：导航 + 内容 + 页脚；认证路由下切换全屏壁纸并让导航/页脚透明。
+-->
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'

@@ -1,3 +1,6 @@
+<!--
+  404 页面：提供回首页/浏览文章的出口，避免死链。
+-->
 <script setup lang="ts">
 import { Compass } from 'lucide-vue-next'
 </script>

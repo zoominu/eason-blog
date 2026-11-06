@@ -1,3 +1,6 @@
+<!--
+  登录页：账号 + 密码，成功后按 redirect 回跳；错误统一展示后端 message。
+-->
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

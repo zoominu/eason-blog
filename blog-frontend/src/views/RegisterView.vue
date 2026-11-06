@@ -1,3 +1,6 @@
+<!--
+  注册页：账号名唯一、邮箱验证码、密码强度、协议勾选；注册成功后自动登录。
+-->
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'

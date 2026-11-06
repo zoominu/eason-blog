@@ -1,3 +1,6 @@
+<!--
+  找回密码：提交邮箱请求重置链接；无论邮箱是否存在都显示相同的成功提示，防枚举。
+-->
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ArrowLeft, Mail } from 'lucide-vue-next'

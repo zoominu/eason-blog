@@ -1,3 +1,6 @@
+<!--
+  后台标签管理：标签增删改查，删除前检查文章引用。
+-->
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

@@ -1,3 +1,6 @@
+<!--
+  后台日志页：登录日志与操作日志分页/筛选，只读。
+-->
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'

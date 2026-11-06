@@ -1,3 +1,6 @@
+/**
+ * 后台登录态：当前管理员信息、登录/退出 action；页面刷新后通过 /auth/me 恢复。
+ */
 import { defineStore } from 'pinia'
 import { authApi } from '@/api'
 import type { User } from '@/api/types'

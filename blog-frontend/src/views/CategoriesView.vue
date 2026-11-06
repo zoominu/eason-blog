@@ -1,3 +1,6 @@
+<!--
+  分类总览：展示分类及公开文章数，点击进入分类详情。
+-->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { taxonomyApi } from '@/api'

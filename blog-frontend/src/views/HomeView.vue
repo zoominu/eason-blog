@@ -1,3 +1,6 @@
+<!--
+  首页：站点概览、最新/推荐文章、标签与统计；首屏尽量少的串行请求。
+-->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ArrowRight, BookOpen, Eye, FileText, Sparkles, Tag as TagIcon } from 'lucide-vue-next'

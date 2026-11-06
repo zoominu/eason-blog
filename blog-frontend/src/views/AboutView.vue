@@ -1,3 +1,6 @@
+<!--
+  关于页：展示站点/作者信息与统计，数据来自公开的 site API。
+-->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { siteApi } from '@/api'

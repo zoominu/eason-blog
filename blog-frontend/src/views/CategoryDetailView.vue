@@ -1,3 +1,6 @@
+<!--
+  分类详情：按 slug 拉取分类信息与文章分页；slug 不存在时展示空态。
+-->
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

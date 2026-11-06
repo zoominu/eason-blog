@@ -1,3 +1,6 @@
+<!--
+  全局 Toast 容器：把 store 中的消息队列渲染成浮层，自动消失，不阻塞页面。
+-->
 <script setup lang="ts">
 import { CheckCircle2, AlertCircle, Info } from 'lucide-vue-next'
 import { toasts } from '@/utils/toast'

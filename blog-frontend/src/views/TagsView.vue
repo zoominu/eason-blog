@@ -1,3 +1,6 @@
+<!--
+  标签总览：展示标签及公开文章数，点击进入标签详情。
+-->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { taxonomyApi } from '@/api'

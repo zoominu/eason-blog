@@ -1,3 +1,6 @@
+<!--
+  全站页脚：读取站点配置展示标题/副标题/版权/备案，并提供用户协议与隐私政策入口。
+-->
 <script setup lang="ts">
 import { computed } from 'vue'
 import { siteApi } from '@/api'

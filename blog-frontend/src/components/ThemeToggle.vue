@@ -1,3 +1,6 @@
+<!--
+  浅色/深色主题切换按钮；主题状态由 theme store 持久化，避免刷新丢失。
+-->
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Monitor, Moon, Sun } from 'lucide-vue-next'

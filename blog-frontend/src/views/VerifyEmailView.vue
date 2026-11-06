@@ -1,3 +1,6 @@
+<!--
+  邮箱验证回调页：读取 token 调用验证接口，展示成功/失败并引导登录。
+-->
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'

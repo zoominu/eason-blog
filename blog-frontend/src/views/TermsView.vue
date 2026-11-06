@@ -1,3 +1,6 @@
+<!--
+  用户协议静态页：服务说明、账号安全、行为规范、知识产权、免责声明与联系方式。
+-->
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { setPageTitle } from '@/utils/seo'

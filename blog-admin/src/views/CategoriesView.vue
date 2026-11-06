@@ -1,3 +1,6 @@
+<!--
+  后台分类管理：树形列表、新增/编辑/删除；删除前提示子分类与文章引用。
+-->
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'

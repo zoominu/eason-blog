@@ -1,3 +1,6 @@
+<!--
+  文章编辑页：Markdown 编辑/预览、封面上传裁剪、分类标签、SEO、草稿/发布。
+-->
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

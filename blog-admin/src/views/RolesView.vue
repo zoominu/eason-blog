@@ -1,3 +1,6 @@
+<!--
+  后台角色权限：角色列表与权限勾选，保存后影响对应管理员的接口权限。
+-->
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'

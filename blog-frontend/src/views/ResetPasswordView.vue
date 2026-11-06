@@ -1,3 +1,6 @@
+<!--
+  重置密码页：从 URL 读取一次性 token，校验新密码后提交；成功后跳登录。
+-->
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
